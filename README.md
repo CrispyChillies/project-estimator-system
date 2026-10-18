@@ -12,7 +12,7 @@ and a backtest page measures whether learning actually helps.
 ## Quickstart
 
 ```bash
-cp .env.example .env        # LLM_MODE=fake works offline; set OPENAI_* + LLM_MODE=live for real LLM
+cp .env.example .env        # LLM_MODE=replay works offline with the committed gpt-6-luna fixtures; fake = heuristics
 make up                     # db + backend + frontend; migrations run on backend start
 make seed                   # idempotent demo history (20 synthetic delivered projects)
 open http://localhost:3000  # API docs: http://localhost:8000/docs
@@ -20,7 +20,8 @@ make backtest               # CLI backtest (no LLM calls)
 make test                   # backend tests (inside the backend container)
 ```
 
-Then follow [docs/DEMO.md](docs/DEMO.md).
+Then follow [docs/DEMO.md](docs/DEMO.md). Live-model validation, spend and the model choice:
+[docs/LIVE_VALIDATION.md](docs/LIVE_VALIDATION.md).
 
 ## Architecture
 

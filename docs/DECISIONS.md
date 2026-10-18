@@ -55,5 +55,38 @@ Short log of choices made where the brief was ambiguous or reality forced a devi
     Google fonts removed so Docker builds work offline.
 21. **Demo auth**: `X-User-Id` from the user switcher (stored in `localStorage` as a UI preference);
     unknown ids fall back to the first PM.
-22. **Cost estimate** in `llm_calls` uses placeholder per-token prices in `llm/gateway.py`; adjust for
-    your model.
+22. ~~Placeholder prices~~ → superseded by 23.
+
+## Live-model validation session (2026-10-18)
+
+23. **Prices** live in `app/llm/budget.py::PRICES` (standard tier, verified on the pricing page today) with an
+    `LLM_PRICES_JSON` override. Unknown models raise `UnknownPrice` instead of costing $0.
+24. **Budget source of truth** = append-only file ledger `data/llm_spend.jsonl` (gitignored). The DB table
+    `llm_calls` is wiped by `docker compose down -v`, so a DB-only cap could be reset by accident. Cache hits and
+    fake calls cost $0 and are not written to the ledger.
+25. **Section budgets nest**; every active section and the global cap are checked before each live call,
+    including each model turn inside the LangChain agent (callback handler).
+26. **Reasoning**: `reasoning_effort=none` for Luna (it supports `none`); temperature is only sent when
+    reasoning is off/none. `model_key = model|estimation prompt version|r=<effort>`; fake mode is `fake-v1`.
+27. **model_key partitioning**: estimates, baselines and raw estimates carry `model_key`. Calibration, analog
+    retrieval and backtests use only the active key. On startup, stats are recomputed when the active key
+    changes, and the UI shows a "calibration restarted" banner if the active key has no history.
+28. **Bake-off stopped at A**: Luna passed every heuristic threshold, so Sol was not run (hard rule "move up
+    only on failure"). The bake-off briefs are short synthetic briefs; the evaluation is small.
+29. **Live seeding** re-estimates synthetic tasks with the live model (raw-estimation step only, K=3 per
+    project, fixed task list) and keeps the simulated actuals. Simulated PM edits are re-expressed as the
+    planted ratio applied to the live raw estimate. Category classification is not re-run (synthetic tasks
+    already have categories).
+30. **Agent cassettes**: live agent turns are recorded once (`scripts/record_agent_cassettes.py`) against a
+    deterministic fake-mode estimate; tests replay them with a fake chat model, remapping task ids by title.
+    In `LLM_MODE=replay` the API replays a cassette when the prompt matches, otherwise it uses the offline
+    parser (badged "Offline demo agent").
+31. **Agent prompt v2** (written before the bake-off, not tuned on it): document text is data, vague requests
+    get a clarifying question or one bounded change, plus explicit tool-routing hints. A `propose_remove_module`
+    tool was added; split proposals are rescaled to preserve the original min/max totals; no-op updates are
+    refused.
+32. **Backtest**: defaults kept and reported as is; no tuning on the evaluated projects. Ablations A1
+    (edit-only, no analogs) and A2 (full without analogs) were added. Synthetic and dataset projects are never
+    pooled (`data_source` filter, synthetic by default).
+33. **Reorder**: keyboard drag (dnd-kit KeyboardSensor) was added. E2E uses it because pointer-drag was
+    unreliable in headless runs.
