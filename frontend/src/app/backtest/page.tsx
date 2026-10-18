@@ -32,6 +32,8 @@ const ESTIMATORS: { key: string; label: string; color: string }[] = [
   { key: "E2_analogs", label: "E2 + analogs", color: "var(--chart-3)" },
   { key: "E3_calibrated_edit", label: "E3 + edit calibration", color: "var(--chart-2)" },
   { key: "E4_calibrated_full", label: "E4 full system", color: "var(--chart-1)" },
+  { key: "A1_edit_only", label: "A1 ablation: edit calibration only (no analogs)", color: "var(--chart-2)" },
+  { key: "A2_full_no_analogs", label: "A2 ablation: full system without analogs", color: "var(--chart-3)" },
 ];
 
 type MetricKey = "MAPE" | "MdAPE" | "PRED25" | "bias" | "coverage_p80" | "interval_width";

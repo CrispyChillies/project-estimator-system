@@ -22,7 +22,16 @@ from app.services.retrieval import Candidate, cosine_rank, select_analogs
 from app.services.settings import LearningParams, get_params
 from app.services.simulation import SimTask, simulate
 
-ESTIMATORS = ["E0_median", "E1_raw_llm", "E2_analogs", "E3_calibrated_edit", "E4_calibrated_full"]
+ESTIMATORS = ["E0_median", "E1_raw_llm", "E2_analogs", "E3_calibrated_edit", "E4_calibrated_full",
+              "A1_edit_only", "A2_full_no_analogs"]
+# (use_analogs, use_edit, use_actual) for the model-based estimators; A* are ablations.
+SPECS: dict[str, tuple[bool, bool, bool]] = {
+    "E2_analogs": (True, False, False),
+    "E3_calibrated_edit": (True, True, False),
+    "E4_calibrated_full": (True, True, True),
+    "A1_edit_only": (False, True, False),
+    "A2_full_no_analogs": (False, True, True),
+}
 Z = NormalDist()
 
 
@@ -91,17 +100,17 @@ def predict(target: ProjectRec, train: list[ProjectRec], estimator: str, p: Lear
             preds.append(Pred(t.key, float(q50), float(q80), float(q10), float(q90), float(t.actual or 0)))
             sim_tasks.append(SimTask(float(q50), t.category, max(math.log(max(q90, 1e-6) / max(q50, 1e-6)) / 1.2816, 0.05)))
     else:
-        idx = index if index is not None else (AnalogIndex(train) if estimator != "E1_raw_llm" else None)
+        use_analogs, use_edit, use_actual = SPECS.get(estimator, (False, False, False))
+        idx = index if index is not None else (AnalogIndex(train) if use_analogs else None)
         for t in tasks:
             rmin, rmax = _raw(t, target)
             if estimator == "E1_raw_llm":
                 pr = predict_task(rmin, rmax, t.category, None, [], {}, {}, p, learning=False)
                 center, sigma = pr.mid, pr.sigma
             else:
-                analogs = idx.query(t, p.analog_top_k) if idx else []
+                analogs = idx.query(t, p.analog_top_k) if (idx and use_analogs) else []
                 pr = predict_task(rmin, rmax, t.category, target.author, analogs, edit, actual, p,
-                                  use_edit=estimator in ("E3_calibrated_edit", "E4_calibrated_full"),
-                                  use_actual=estimator == "E4_calibrated_full")
+                                  use_analogs=use_analogs, use_edit=use_edit, use_actual=use_actual)
                 center, sigma = pr.mid, pr.sigma
             preds.append(Pred(t.key, center, center * math.exp(Z.inv_cdf(0.8) * sigma),
                               center * math.exp(Z.inv_cdf(0.1) * sigma), center * math.exp(Z.inv_cdf(0.9) * sigma),
@@ -109,9 +118,9 @@ def predict(target: ProjectRec, train: list[ProjectRec], estimator: str, p: Lear
             sim_tasks.append(SimTask(center, t.category, sigma))
     proj = None
     if project_level and tasks:
-        calibrated = estimator in ("E3_calibrated_edit", "E4_calibrated_full")
-        sim = simulate(sim_tasks, actual if estimator == "E4_calibrated_full" else {}, p, seed=1234, draws=draws,
-                       shared_factor=calibrated)
+        calibrated = SPECS.get(estimator, (False, False, False))[1]
+        sim = simulate(sim_tasks, actual if SPECS.get(estimator, (0, 0, False))[2] else {}, p, seed=1234,
+                       draws=draws, shared_factor=calibrated)
         proj = Pred(None, sim["p50"], sim["p80"], sim["p10"], sim["p90"], sum(t.actual or 0 for t in tasks))
     return preds, proj
 
