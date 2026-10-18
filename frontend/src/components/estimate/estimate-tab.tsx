@@ -5,7 +5,7 @@ import { Bot, Copy, Download, GitCompare, Lock } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { EmptyState, ErrorState, StatusBadge } from "@/components/common";
+import { EmptyState, ErrorState, ModelStatusBanner, StatusBadge } from "@/components/common";
 import { AgentPanel } from "@/components/estimate/agent-panel";
 import { EstimateTable, type Highlight } from "@/components/estimate/estimate-table";
 import { SummaryPanel } from "@/components/estimate/summary-panel";
@@ -285,6 +285,7 @@ export function EstimateTab({
 
   return (
     <div className="space-y-3">
+      <ModelStatusBanner />
       {toolbar}
       {agent && estimateId ? (
         <ResizablePanelGroup orientation="horizontal" className="min-h-[640px] rounded-lg border">

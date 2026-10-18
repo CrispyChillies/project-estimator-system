@@ -54,6 +54,28 @@ def cost_usd(model: str, input_tokens: int, output_tokens: int, cached_tokens: i
     return (uncached * p["input"] + cached_tokens * p["cached"] + output_tokens * p["output"]) / 1e6
 
 
+def ledger_path():
+    return get_settings().fixtures_dir.parent / "llm_spend.jsonl"
+
+
+def append_ledger(entry: dict) -> None:
+    """Append-only spend ledger outside the DB, so `docker compose down -v` cannot reset the cap."""
+    p = ledger_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with p.open("a") as f:
+        f.write(json.dumps(entry, default=str) + "\n")
+
+
+def _ledger_spend() -> float:
+    p = ledger_path()
+    total = 0.0
+    if p.exists():
+        for line in p.read_text().splitlines():
+            if line.strip():
+                total += float(json.loads(line).get("cost_usd", 0.0))
+    return total + unlogged_spend
+
+
 def _db_spend(section: str | None = None) -> float:
     from app.db.models import LLMCall
     from app.db.session import SessionLocal
@@ -83,7 +105,7 @@ class Section:
 
 _sections: ContextVar[tuple[Section, ...]] = ContextVar("llm_budget_sections", default=())
 EPS = 1e-9
-spend_fn: Callable[[], float] = _db_spend  # swapped in tests
+spend_fn: Callable[[], float] = _ledger_spend  # swapped in tests
 
 
 @contextmanager

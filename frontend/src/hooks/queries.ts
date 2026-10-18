@@ -158,6 +158,24 @@ export const useLearningSettings = () =>
   useQuery({ queryKey: ["learning-settings"], queryFn: () => api<LearningSettings>("/settings/learning") });
 export const useLLMUsage = () => useQuery({ queryKey: ["llm-usage"], queryFn: () => api<LLMUsage>("/llm/usage") });
 
+export interface ModelStatus {
+  active_model_key: string;
+  calibration_model_key: string | null;
+  final_estimates_by_key: Record<string, number>;
+  active_history: number;
+  restarted: boolean;
+}
+export const useModelStatus = () =>
+  useQuery({ queryKey: ["model-status"], queryFn: () => api<ModelStatus>("/insights/model-status") });
+
+export interface AdminUsage {
+  total_cost_usd: number;
+  budget_usd: number;
+  by_section: { key: string | null; calls: number; cost_usd: number; cache_hits: number }[];
+}
+export const useAdminUsage = () =>
+  useQuery({ queryKey: ["admin-usage"], queryFn: () => api<AdminUsage>("/admin/llm-usage") });
+
 export function useJob(id: string | null) {
   return useQuery({
     queryKey: ["job", id],

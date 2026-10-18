@@ -1,5 +1,6 @@
 .env
 data/raw/
+data/llm_spend.jsonl
 uploads/
 !data/fixtures/
 **/__pycache__/

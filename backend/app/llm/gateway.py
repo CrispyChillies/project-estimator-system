@@ -114,12 +114,18 @@ class LLMGateway:
     def log_call(self, **kw: Any) -> None:
         kw.setdefault("model_key", self.model_key)
         kw.setdefault("section", budget.current_section())
+        cost = float(kw.get("cost_usd") or 0.0)
+        if cost > 0:
+            try:
+                budget.append_ledger({"ts": time.time(), "section": kw["section"], "model": kw.get("model"),
+                                      "purpose": kw.get("purpose"), "cost_usd": cost})
+            except OSError:
+                budget.record_unlogged(cost)
         try:
             with SessionLocal() as db:
                 db.add(LLMCall(**kw))
                 db.commit()
-        except Exception:  # logging must never break the main flow, but spend must never be lost
-            budget.record_unlogged(float(kw.get("cost_usd") or 0.0))
+        except Exception:  # logging must never break the main flow; the file ledger already holds the cost
             log.exception("failed to log llm call")
 
     def _require_live(self) -> None:

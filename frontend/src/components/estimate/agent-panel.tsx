@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { errorToast, useInvalidateEstimate, useProposals } from "@/hooks/queries";
+import { errorToast, useInvalidateEstimate, useLLMUsage, useProposals } from "@/hooks/queries";
 import { api, postSSE } from "@/lib/api";
 import type { BulkChange, Proposal, ProposalOp } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -136,6 +136,8 @@ export function AgentPanel({ estimateId, readOnly }: { estimateId: string; readO
   const [mode, setMode] = useState("chat");
   const sessionRef = useRef<string | null>(null);
   const { data: pending, refetch } = useProposals(estimateId);
+  const { data: usage } = useLLMUsage();
+  const offline = !!usage && !(["live", "record"] as string[]).includes(usage.mode);
   const invalidate = useInvalidateEstimate();
 
   const send = async (t: string) => {
@@ -175,6 +177,11 @@ export function AgentPanel({ estimateId, readOnly }: { estimateId: string; readO
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 font-medium">
           <Bot className="size-4" /> AI Agent
+          {offline && (
+            <Badge variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-400">
+              Offline demo agent
+            </Badge>
+          )}
         </div>
         <ToggleGroup value={[mode]} onValueChange={(v) => v.length && setMode(String(v[0]))} size="sm" variant="outline">
           <ToggleGroupItem value="chat">Chat</ToggleGroupItem>
@@ -182,6 +189,9 @@ export function AgentPanel({ estimateId, readOnly }: { estimateId: string; readO
         </ToggleGroup>
       </div>
       <p className="text-xs text-muted-foreground">
+        {offline
+          ? "LLM_MODE is not live: a deterministic command parser stands in for the LLM agent. "
+          : ""}
         The agent never edits directly: every change is a reviewable proposal, logged when you accept or reject it.
       </p>
       <ScrollArea className="min-h-0 flex-1 rounded-md border">

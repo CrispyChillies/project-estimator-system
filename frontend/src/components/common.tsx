@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { useJob } from "@/hooks/queries";
+import { useJob, useModelStatus } from "@/hooks/queries";
 import type { Job } from "@/lib/types";
 
 export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: React.ReactNode }) {
@@ -50,6 +50,22 @@ export function StatusBadge({ status }: { status: string }) {
     <Badge variant="secondary" className={STATUS_STYLE[status] ?? ""}>
       {status}
     </Badge>
+  );
+}
+
+export function ModelStatusBanner() {
+  const { data } = useModelStatus();
+  if (!data?.restarted) return null;
+  const others = Object.entries(data.final_estimates_by_key).filter(([k]) => k !== data.active_model_key);
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-sky-500/40 bg-sky-500/5 px-3 py-2 text-sm text-sky-800 dark:text-sky-300">
+      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+      <span>
+        Calibration restarted for model <code className="text-xs">{data.active_model_key}</code>: no finalized history was
+        produced with this model yet. History from other models is kept separate and not used (
+        {others.map(([k, n]) => `${k}: ${n}`).join(", ")}).
+      </span>
+    </div>
   );
 }
 
