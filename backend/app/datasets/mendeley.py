@@ -37,7 +37,7 @@ def manual_instructions() -> str:
     return (f"Could not download the Mendeley dataset automatically.\n"
             f"  1. Open {PAGE} in a browser and check the license shown on the page.\n"
             f"  2. Download all files ('Download All').\n"
-            f"  3. Unzip and place the CSV/XLSX file(s) in: {raw_dir()}\n"
+            f"  3. Unzip and place the CSV/XLSX file(s) in: {raw_dir()} (repo path: data/raw/mendeley/)\n"
             f"  4. Record the license in docs/DATASETS.md, then run `make seed` again.\n"
             f"Seeding continues with synthetic data only.")
 

@@ -27,7 +27,7 @@ backtest:
 	$(BACKEND) python scripts/run_backtest.py
 
 test:
-	$(COMPOSE) exec -e LLM_MODE=fake -e TEST_DATABASE_URL=postgresql+psycopg://calibr:$${POSTGRES_PASSWORD:-calibr}@db:5432/calibr_test backend python -m pytest -q
+	$(COMPOSE) exec -e LLM_MODE=fake -e TEST_DATABASE_URL=postgresql+psycopg://calibr:$${POSTGRES_PASSWORD:-calibr}@db:5432/calibr_test backend python -m pytest -q -p no:cacheprovider
 
 lint:
 	cd backend && uv run ruff check .

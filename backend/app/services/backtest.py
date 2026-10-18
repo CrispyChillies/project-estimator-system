@@ -162,12 +162,15 @@ def splits(recs: list[ProjectRec], protocol: str) -> list[tuple[ProjectRec, list
 def learning_curve(recs: list[ProjectRec], p: LearningParams, estimators=("E1_raw_llm", "E3_calibrated_edit", "E4_calibrated_full"),
                    orderings: int = 6, max_test: int = 4, seed: int = 11) -> list[dict]:
     rng = random.Random(seed)
+    max_test = min(max_test, max(1, len(recs) // 3))
     acc: dict[tuple[int, str], list[float]] = defaultdict(list)
     for _ in range(orderings):
         order = recs[:]
         rng.shuffle(order)
-        for n in range(1, len(order)):
-            train, test = order[:n], order[n:n + max_test]
+        # Fixed test set per ordering so the curve isolates the effect of more training data.
+        test, pool = order[-max_test:], order[:-max_test]
+        for n in range(1, len(pool) + 1):
+            train = pool[:n]
             stats = stats_from_records(train, p)
             idx = AnalogIndex(train)
             for est in estimators:
