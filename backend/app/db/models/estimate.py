@@ -38,6 +38,7 @@ class Estimate(IdMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(10), default="draft")
     source: Mapped[str] = mapped_column(String(10), default="ai")
     learning_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    model_key: Mapped[str] = mapped_column(String(160), default="fake-v1", index=True)
     model_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     summary: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -107,6 +108,7 @@ class TaskAIBaseline(IdMixin, TimestampMixin, Base):
     provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     prompt_version: Mapped[str] = mapped_column(String(40))
     model: Mapped[str] = mapped_column(String(80))
+    model_key: Mapped[str] = mapped_column(String(160), default="fake-v1")
 
 
 class Assumption(IdMixin, TimestampMixin, Base):

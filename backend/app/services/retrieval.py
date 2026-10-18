@@ -28,7 +28,11 @@ def select_analogs(cands: Sequence[Candidate], category: str, top_k: int) -> lis
 
 
 def find_analogs(db: Session, embedding: Sequence[float], category: str, *, exclude_project_id: uuid.UUID | None,
-                 allowed_project_ids: Iterable[uuid.UUID] | None = None, top_k: int = 5) -> list[Analog]:
+                 allowed_project_ids: Iterable[uuid.UUID] | None = None, top_k: int = 5,
+                 model_key: str | None = None) -> list[Analog]:
+    from app.services.learning import active_model_key
+
+    key = model_key or active_model_key()
     dist = Task.embedding.cosine_distance(list(embedding)).label("dist")
     q = (
         select(Task, Project.id, Project.name, TaskCategory.key, TaskAIBaseline.raw_min, TaskAIBaseline.raw_max,
@@ -39,7 +43,7 @@ def find_analogs(db: Session, embedding: Sequence[float], category: str, *, excl
         .outerjoin(TaskCategory, TaskCategory.id == Task.category_id)
         .outerjoin(TaskAIBaseline, TaskAIBaseline.task_id == Task.id)
         .outerjoin(TaskActual, TaskActual.task_id == Task.id)
-        .where(Estimate.status == "final", Task.enabled.is_(True), Task.removed.is_(False),
+        .where(Estimate.status == "final", Estimate.model_key == key, Task.enabled.is_(True), Task.removed.is_(False),
                Module.removed.is_(False), Task.embedding.is_not(None))
         .order_by(dist)
         .limit(top_k * 6)

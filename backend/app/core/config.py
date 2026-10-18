@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=("../.env", ".env"), extra="ignore")
 
     database_url: str = "postgresql+psycopg://calibr:calibr@localhost:5432/calibr"
     openai_api_key: str = ""
@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     max_upload_mb: int = 15
     cors_origins: str = "http://localhost:3000"
     log_level: str = "INFO"
+    # Hard cap on cumulative live LLM spend (sum of llm_calls.cost_usd).
+    llm_budget_usd: float = 5.0
+    # Optional JSON override of the PRICES table: {"model": {"input": .., "cached": .., "output": ..}}
+    llm_prices_json: str = ""
+    # Reasoning effort sent to reasoning models (e.g. none/low); empty = omit the parameter.
+    llm_reasoning_effort: str = ""
+    llm_timeout_s: int = 120
 
 
 @lru_cache

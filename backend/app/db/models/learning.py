@@ -85,6 +85,10 @@ class LLMCall(IdMixin, TimestampMixin, Base):
     latency_ms: Mapped[int] = mapped_column(Integer, default=0)
     cost_usd: Mapped[float] = mapped_column(Float, default=0)
     cache_hit: Mapped[bool] = mapped_column(Boolean, default=False)
+    model_key: Mapped[str | None] = mapped_column(String(160), index=True)
+    section: Mapped[str | None] = mapped_column(String(60), index=True)
+    cached_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    reasoning_tokens: Mapped[int] = mapped_column(Integer, default=0)
     request: Mapped[Any] = mapped_column(JSONB, nullable=True)
     response: Mapped[Any] = mapped_column(JSONB, nullable=True)
 
@@ -97,6 +101,7 @@ class LLMRawEstimate(IdMixin, TimestampMixin, Base):
     run_idx: Mapped[int] = mapped_column(Integer)
     prompt_version: Mapped[str] = mapped_column(String(40))
     model: Mapped[str] = mapped_column(String(80))
+    model_key: Mapped[str] = mapped_column(String(160), default="fake-v1", index=True)
     raw_min: Mapped[float] = mapped_column(Float)
     raw_max: Mapped[float] = mapped_column(Float)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)

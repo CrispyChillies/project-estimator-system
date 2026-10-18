@@ -367,6 +367,7 @@ class RuleStatusIn(BaseModel):
 
 class BacktestIn(BaseModel):
     protocol: Literal["loo", "chronological"] = "loo"
+    data_source: Literal["synthetic", "dataset"] = "synthetic"
 
 
 class BacktestRunOut(ORM):

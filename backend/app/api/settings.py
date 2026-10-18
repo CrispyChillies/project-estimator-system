@@ -107,6 +107,33 @@ def llm_usage(db: Session = Depends(get_db)):
                       by_purpose=[{"purpose": p, "calls": c, "cost_usd": float(x)} for p, c, x in by])
 
 
+@router.get("/admin/llm-usage")
+def admin_llm_usage(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Cumulative live spend vs LLM_BUDGET_USD (reasoning tokens are included in output tokens)."""
+    from app.core.config import get_settings
+
+    def grouped(col):
+        rows = db.execute(select(col, func.count(), func.coalesce(func.sum(LLMCall.cost_usd), 0),
+                                 func.coalesce(func.sum(LLMCall.input_tokens), 0),
+                                 func.coalesce(func.sum(LLMCall.output_tokens), 0),
+                                 func.coalesce(func.sum(LLMCall.reasoning_tokens), 0),
+                                 func.count().filter(LLMCall.cache_hit.is_(True))).group_by(col)).all()
+        return [{"key": k, "calls": c, "cost_usd": float(x), "input_tokens": i, "output_tokens": o,
+                 "reasoning_tokens": r, "cache_hits": h} for k, c, x, i, o, r, h in rows]
+
+    total = float(db.scalar(select(func.coalesce(func.sum(LLMCall.cost_usd), 0))) or 0)
+    return {"total_cost_usd": total, "budget_usd": get_settings().llm_budget_usd,
+            "by_section": grouped(LLMCall.section), "by_model": grouped(LLMCall.model),
+            "by_purpose": grouped(LLMCall.purpose), "by_model_key": grouped(LLMCall.model_key)}
+
+
+@router.get("/insights/model-status")
+def model_status(db: Session = Depends(get_db)) -> dict[str, Any]:
+    from app.services.learning import model_status as status
+
+    return status(db)
+
+
 @router.get("/jobs/{job_id}", response_model=S.JobOut)
 def get_job(job_id: uuid.UUID, db: Session = Depends(get_db)):
     return jobs.get_job(db, job_id)

@@ -219,18 +219,24 @@ def run_backtest_core(recs: list[ProjectRec], p: LearningParams, protocol: str =
     return {"summary": summary, "task_preds": task_preds, "proj_preds": proj_preds, "n_train": n_train}
 
 
-def eligible_records(db: Session) -> list[ProjectRec]:
+def eligible_records(db: Session, data_source: str | None = None) -> list[ProjectRec]:
     recs = load_records(db, with_embeddings=True, with_raw_samples=True)
-    return [r for r in recs if r.data_source in ("dataset", "synthetic") and r.delivered and eval_tasks(r)]
+    sources = (data_source,) if data_source else ("dataset", "synthetic")
+    return [r for r in recs if r.data_source in sources and r.delivered and eval_tasks(r)]
 
 
 def run_backtest(db: Session, config: dict, progress: Callable[[float, str], None] | None = None) -> BacktestRun:
+    from app.services.learning import active_model_key
+
     p = get_params(db)
     protocol = config.get("protocol", "loo")
-    run = BacktestRun(config={"protocol": protocol, "params": p.model_dump()}, status="running")
+    # Never pool synthetic and real dataset projects.
+    source = config.get("data_source") or "synthetic"
+    run = BacktestRun(config={"protocol": protocol, "params": p.model_dump(), "model_key": active_model_key(),
+                              "data_source": source}, status="running")
     db.add(run)
     db.flush()
-    recs = eligible_records(db)
+    recs = eligible_records(db, source)
     if progress:
         progress(0.05, f"{len(recs)} eligible projects")
     out = run_backtest_core(recs, p, protocol, progress)

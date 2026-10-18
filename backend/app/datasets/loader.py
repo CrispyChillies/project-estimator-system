@@ -33,9 +33,28 @@ from app.services.summary import compute_summary
 log = logging.getLogger(__name__)
 
 
-def load_project(db: Session, sp: SynthProject, data_source: str, *, model_label: str) -> Project | None:
-    if db.scalar(select(Project.id).where(Project.name == sp.name, Project.data_source == data_source)):
+def _llm_raw(sp: SynthProject, k: int) -> dict[str, list[tuple[float, float]]]:
+    """Raw estimates from the configured model for the fixed task list (estimation step only)."""
+    from app.agents.chains import run_estimation
+
+    tasks = [{"key": t.key, "title": t.title, "description": t.description, "category_key": t.category,
+              "role_name": t.role} for t in sp.tasks if t.origin == "ai"]
+    summary = sp.brief.splitlines()[2] if len(sp.brief.splitlines()) > 2 else sp.name
+    _, samples = run_estimation(tasks, summary, [], k)
+    return samples
+
+
+def load_project(db: Session, sp: SynthProject, data_source: str, *, model_label: str | None = None,
+                 k: int = 3) -> Project | None:
+    gw = get_gateway()
+    key = gw.model_key
+    exists = db.scalar(select(Project.id).join(Estimate, Estimate.project_id == Project.id)
+                       .where(Project.name == sp.name, Project.data_source == data_source, Estimate.model_key == key))
+    if exists:
         return None
+    # fake mode keeps the simulator's raw estimates; live/record/replay asks the model (cached in fixtures)
+    live_samples = _llm_raw(sp, k) if gw.mode != "fake" else None
+    model_label = model_label or (gw.model if live_samples is not None else "synthetic-raw-llm")
     hist = db.scalar(select(User).where(User.email == HISTORY_EMAIL))
     actor = es.Actor("user", hist.id if hist else None)
     _, cat2id = category_maps(db)
@@ -51,9 +70,10 @@ def load_project(db: Session, sp: SynthProject, data_source: str, *, model_label
     db.flush()
     add_chunks(db, doc, sp.brief)
     est = Estimate(project_id=p.id, version=1, status="draft", source="ai", learning_enabled=False,
-                   created_by=actor.user_id,
-                   model_snapshot={"model": model_label, "llm_mode": "historical", "prompt_versions": PROMPT_VERSIONS,
-                                   "note": f"{data_source} history: raw estimates cached/generated, no live LLM call"})
+                   created_by=actor.user_id, model_key=key,
+                   model_snapshot={"model": model_label, "model_key": key, "llm_mode": gw.mode,
+                                   "prompt_versions": PROMPT_VERSIONS,
+                                   "note": f"{data_source} history: actuals and PM edits simulated; raw from {model_label}"})
     db.add(est)
     db.flush()
     vecs = get_gateway().embed([f"{t.title}\n{t.description}" for t in sp.tasks])
@@ -66,8 +86,15 @@ def load_project(db: Session, sp: SynthProject, data_source: str, *, model_label
         if t.origin != "ai":
             created.append((t, None))
             continue
-        rmin = statistics.median(s[0] for s in t.raw_samples)
-        rmax = statistics.median(s[1] for s in t.raw_samples)
+        sim_samples = t.raw_samples
+        samples = (live_samples.get(t.key) or sim_samples) if live_samples is not None else sim_samples
+        rmin = statistics.median(s[0] for s in samples)
+        rmax = statistics.median(s[1] for s in samples)
+        if live_samples is not None and t.final is not None:
+            # keep the planted PM behaviour as a ratio to whatever raw estimate the PM saw
+            sim_mid = statistics.median((a + b) / 2 for a, b in sim_samples)
+            f = ((t.final[0] + t.final[1]) / 2) / sim_mid
+            t.final = (max(0.5, round(rmin * f * 2) / 2), max(0.5, round(rmax * f * 2) / 2))
         task = es.create_task(db, est.id, {
             "module_id": m.id, "title": t.title, "description": t.description, "category_id": cat2id.get(t.category),
             "delivery_role_id": role2id.get(t.role), "min_hours": rmin, "max_hours": rmax, "ai_key": t.key,
@@ -75,12 +102,12 @@ def load_project(db: Session, sp: SynthProject, data_source: str, *, model_label
         }, es.SYSTEM, origin="ai", log=False)
         db.add(TaskAIBaseline(task_id=task.id, estimate_id=est.id, ai_key=t.key, raw_min=rmin, raw_max=rmax,
                               applied_factor=1.0, shown_min=rmin, shown_max=rmax, category_key=t.category,
-                              provenance={"raw": {"min": rmin, "max": rmax, "samples": [list(s) for s in t.raw_samples]},
+                              provenance={"raw": {"min": rmin, "max": rmax, "samples": [list(s) for s in samples]},
                                           "analogs": [], "calibration": None, "learning": False, "rules_applied": []},
-                              prompt_version=PROMPT_VERSIONS["estimation"], model=model_label))
-        for i, (a, b) in enumerate(t.raw_samples):
+                              prompt_version=PROMPT_VERSIONS["estimation"], model=model_label, model_key=key))
+        for i, (a, b) in enumerate(samples):
             db.add(LLMRawEstimate(project_id=p.id, task_key=t.key, run_idx=i, prompt_version=PROMPT_VERSIONS["estimation"],
-                                  model=model_label, raw_min=a, raw_max=b))
+                                  model=model_label, model_key=key, raw_min=a, raw_max=b))
         created.append((t, task))
     db.flush()
     # Historical PM edits, through the service layer => edit_events with actor=user (Historical team)

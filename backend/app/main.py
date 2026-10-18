@@ -22,6 +22,9 @@ log = logging.getLogger("app")
 async def lifespan(_: FastAPI):
     with SessionLocal() as db:
         ensure_reference_data(db)
+        from app.services.learning import ensure_calibration_for_active_model
+
+        ensure_calibration_for_active_model(db)
     log.info("startup", extra={"extra": {"llm_mode": cfg.llm_mode}})
     yield
 

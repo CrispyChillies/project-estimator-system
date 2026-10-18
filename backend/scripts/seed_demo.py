@@ -8,7 +8,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.datasets import mendeley, synthetic  # noqa: E402
 from app.datasets.loader import load_project  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
-from app.llm.gateway import get_gateway  # noqa: E402
 from app.services.learning import propose_lessons, recompute  # noqa: E402
 from app.services.reference import ensure_reference_data  # noqa: E402
 
@@ -18,7 +17,7 @@ def main() -> None:
         ensure_reference_data(db)
         n_new = 0
         for sp in synthetic.generate():
-            if load_project(db, sp, "synthetic", model_label="synthetic-raw-llm"):
+            if load_project(db, sp, "synthetic"):
                 n_new += 1
                 db.commit()
         print(f"synthetic projects added: {n_new}")
@@ -31,7 +30,7 @@ def main() -> None:
             print("Mendeley dataset not present (run `make fetch-datasets`); skipping.")
         m_new = 0
         for sp in projects:
-            if load_project(db, sp, "dataset", model_label=get_gateway().model):
+            if load_project(db, sp, "dataset"):
                 m_new += 1
                 db.commit()
         print(f"dataset projects added: {m_new}")

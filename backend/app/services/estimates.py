@@ -216,7 +216,7 @@ def clone_estimate(db: Session, estimate_id: uuid.UUID, user_id: uuid.UUID | Non
     """New draft version with the same tasks; AI baselines are copied so learning stays anchored to raw output."""
     src = get_estimate(db, estimate_id)
     version = (db.scalar(select(func.max(Estimate.version)).where(Estimate.project_id == src.project_id)) or 0) + 1
-    est = Estimate(project_id=src.project_id, version=version, status="draft", source="clone",
+    est = Estimate(project_id=src.project_id, version=version, status="draft", source="clone", model_key=src.model_key,
                    learning_enabled=src.learning_enabled, model_snapshot=src.model_snapshot, summary=src.summary,
                    created_by=user_id, parent_estimate_id=src.id)
     db.add(est)
@@ -244,6 +244,6 @@ def clone_estimate(db: Session, estimate_id: uuid.UUID, user_id: uuid.UUID | Non
                                   calibrated_min=b.calibrated_min, calibrated_max=b.calibrated_max,
                                   applied_factor=b.applied_factor, shown_min=b.shown_min, shown_max=b.shown_max,
                                   category_key=b.category_key, provenance=b.provenance,
-                                  prompt_version=b.prompt_version, model=b.model))
+                                  prompt_version=b.prompt_version, model=b.model, model_key=b.model_key))
     db.flush()
     return est

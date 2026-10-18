@@ -75,8 +75,9 @@ def generate(db: Session, project_id: uuid.UUID, document_ids: list[uuid.UUID], 
     deco = chains.run_decomposition(ex, categories, roles, rule_texts)
 
     est = Estimate(project_id=project_id, version=next_version(db, project_id), status="draft", source="ai",
-                   learning_enabled=learning, created_by=user_id,
-                   model_snapshot={"model": gw.model, "embedding_model": gw.embedding_model, "llm_mode": gw.mode,
+                   learning_enabled=learning, created_by=user_id, model_key=gw.model_key,
+                   model_snapshot={"model": gw.model, "model_key": gw.model_key, "embedding_model": gw.embedding_model,
+                                   "llm_mode": gw.mode, "reasoning": gw.reasoning,
                                    "prompt_versions": PROMPT_VERSIONS, "params": p.model_dump(),
                                    "raw_samples": p.raw_samples, "summary": ex.summary,
                                    "rules_active": [str(r.id) for r in rules]})
@@ -92,7 +93,7 @@ def generate(db: Session, project_id: uuid.UUID, document_ids: list[uuid.UUID], 
     raw, samples = chains.run_estimation(task_dicts, ex.summary, rule_texts, p.raw_samples)
     for key, ss in samples.items():
         for i, (lo, hi) in enumerate(ss):
-            db.add(LLMRawEstimate(project_id=project_id, task_key=key, run_idx=i,
+            db.add(LLMRawEstimate(project_id=project_id, task_key=key, run_idx=i, model_key=gw.model_key,
                                   prompt_version=PROMPT_VERSIONS["estimation"], model=gw.model, raw_min=lo, raw_max=hi))
 
     progress(0.65, "Retrieving analogs and calibrating")
@@ -133,7 +134,7 @@ def generate(db: Session, project_id: uuid.UUID, document_ids: list[uuid.UUID], 
             calibrated_min=pred.min_hours if learning else None, calibrated_max=pred.max_hours if learning else None,
             applied_factor=pred.applied_factor, shown_min=pred.min_hours, shown_max=pred.max_hours,
             category_key=td["category_key"], provenance=provenance,
-            prompt_version=PROMPT_VERSIONS["estimation"], model=gw.model,
+            prompt_version=PROMPT_VERSIONS["estimation"], model=gw.model, model_key=gw.model_key,
         ))
         by_key[td["key"]] = pred.applied_factor
 

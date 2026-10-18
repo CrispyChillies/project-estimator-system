@@ -76,10 +76,19 @@ class ProjectRec:
         return self.status == "delivered"
 
 
-def latest_final_estimates(db: Session, project_ids: list[uuid.UUID] | None = None) -> dict[uuid.UUID, Estimate]:
+def active_model_key() -> str:
+    from app.llm.gateway import get_gateway
+
+    return get_gateway().model_key
+
+
+def latest_final_estimates(db: Session, project_ids: list[uuid.UUID] | None = None,
+                           model_key: str | None = None) -> dict[uuid.UUID, Estimate]:
     q = select(Estimate).where(Estimate.status == "final").order_by(Estimate.finalized_at.asc().nulls_first())
     if project_ids is not None:
         q = q.where(Estimate.project_id.in_(project_ids))
+    if model_key is not None:
+        q = q.where(Estimate.model_key == model_key)
     out: dict[uuid.UUID, Estimate] = {}
     for e in db.scalars(q):
         out[e.project_id] = e  # last wins
@@ -87,9 +96,11 @@ def latest_final_estimates(db: Session, project_ids: list[uuid.UUID] | None = No
 
 
 def load_records(db: Session, project_ids: list[uuid.UUID] | None = None, *, with_embeddings: bool = False,
-                 with_raw_samples: bool = False) -> list[ProjectRec]:
+                 with_raw_samples: bool = False, model_key: str | None = None) -> list[ProjectRec]:
+    """History for ONE model_key (default: the active one) so fake and live data never mix."""
     id2cat, _ = category_maps(db)
-    finals = latest_final_estimates(db, project_ids)
+    key = model_key or active_model_key()
+    finals = latest_final_estimates(db, project_ids, key)
     if not finals:
         return []
     projects = {p.id: p for p in db.scalars(select(Project).where(Project.id.in_(list(finals))))}
@@ -104,7 +115,8 @@ def load_records(db: Session, project_ids: list[uuid.UUID] | None = None, *, wit
         unplanned[u.project_id] += u.hours
     raw_samples: dict[uuid.UUID, dict[str, list[tuple[float, float]]]] = defaultdict(lambda: defaultdict(list))
     if with_raw_samples:
-        for r in db.scalars(select(LLMRawEstimate).where(LLMRawEstimate.project_id.in_(list(finals)))
+        for r in db.scalars(select(LLMRawEstimate).where(LLMRawEstimate.project_id.in_(list(finals)),
+                                                         LLMRawEstimate.model_key == key)
                             .order_by(LLMRawEstimate.run_idx)):
             raw_samples[r.project_id][r.task_key].append((r.raw_min, r.raw_max))
 
@@ -225,9 +237,45 @@ def recompute(db: Session, trigger: str, *, project_id: uuid.UUID | None = None,
                                    shrunk_var=s.shrunk_var, residuals=s.residuals))
         db.add(CalibrationRun(trigger=trigger, layer=layer, project_id=project_id,
                               stats_snapshot={"stats": _snapshot(stats), "structural": signals,
-                                              "n_projects": len(recs)}))
+                                              "n_projects": len(recs), "model_key": active_model_key()}))
+    db.flush()
+    from app.db.models import Setting
+
+    row = db.get(Setting, "calibration_model_key")
+    if row is None:
+        db.add(Setting(key="calibration_model_key", value=active_model_key()))
+    else:
+        row.value = active_model_key()
     db.flush()
     return {"edit": _snapshot(edit), "actual": _snapshot(actual)}
+
+
+def model_status(db: Session) -> dict:
+    """Which model_key the calibration belongs to, and whether it restarted because the model changed."""
+    from sqlalchemy import func as sa_func
+
+    from app.db.models import Setting
+
+    key = active_model_key()
+    counts = {k: n for k, n in db.execute(select(Estimate.model_key, sa_func.count())
+                                          .where(Estimate.status == "final").group_by(Estimate.model_key))}
+    row = db.get(Setting, "calibration_model_key")
+    return {"active_model_key": key, "calibration_model_key": row.value if row else None,
+            "final_estimates_by_key": counts, "active_history": counts.get(key, 0),
+            "restarted": counts.get(key, 0) == 0 and any(n > 0 for k, n in counts.items() if k != key)}
+
+
+def ensure_calibration_for_active_model(db: Session) -> bool:
+    """Recompute stats when the active model_key differs from the one the stored stats were built for."""
+    from app.db.models import Setting
+
+    row = db.get(Setting, "calibration_model_key")
+    if row is not None and row.value == active_model_key():
+        return False
+    recompute(db, "manual")
+    db.commit()
+    log.info("calibration recomputed for model_key", extra={"extra": {"model_key": active_model_key()}})
+    return True
 
 
 # ---------------- hooks ----------------
