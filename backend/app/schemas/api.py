@@ -392,6 +392,8 @@ class LLMUsage(BaseModel):
     mode: str
     model: str
     embedding_model: str
+    ledger_cost_usd: float = 0.0
+    budget_usd: float = 0.0
     by_purpose: list[dict[str, Any]]
 
 

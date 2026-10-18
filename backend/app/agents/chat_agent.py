@@ -147,6 +147,10 @@ class AgentTools:
             return "Task not found."
         changes = {k: v for k, v in {"min_hours": min_hours, "max_hours": max_hours, "title": title,
                                      "role_name": role_name, "category_key": category_key}.items() if v is not None}
+        current = {"min_hours": t.min_hours, "max_hours": t.max_hours, "title": t.title}
+        changes = {k: v for k, v in changes.items() if k not in current or current[k] != v}
+        if not changes:
+            return "No change needed: the task already has these values. No proposal created."
         op = pr.add_op(self.db, self._proposal(), "update_task", {
             "task_id": str(t.id), "changes": changes, "before": {"min_hours": t.min_hours, "max_hours": t.max_hours, "title": t.title},
         }, summary=f"Update '{t.title}': {changes}", rationale=rationale)
@@ -295,8 +299,23 @@ def fake_agent(tools: AgentTools, text: str) -> str:
     return head + "\n".join(o for o in out if not o.startswith("Proposed op"))
 
 
+def _cassette_for(db: Session, estimate_id: uuid.UUID, text: str):
+    """In replay mode, a recorded live agent conversation with the same prompt is replayed (no network)."""
+    from app.agents.cassettes import cassette_dir, replay_model
+
+    d = cassette_dir()
+    if not d.exists():
+        return None
+    for p in sorted(d.glob("*.json")):
+        if json.loads(p.read_text()).get("prompt", "").strip().lower() == text.strip().lower():
+            titles = {t.title: str(t.id) for t in db.scalars(select(Task).where(Task.estimate_id == estimate_id))}
+            return replay_model(p.stem, titles)
+    return None
+
+
 def stream_agent(db: Session, estimate_id: uuid.UUID, session_id: uuid.UUID | None, text: str,
-                 user_id: uuid.UUID | None) -> Iterator[str]:
+                 user_id: uuid.UUID | None, *, model=None, callbacks: list | None = None) -> Iterator[str]:
+    """`model` overrides the LLM (cassette replay in tests); otherwise live/record use the gateway's chat model."""
     session = db.get(AgentSession, session_id) if session_id else None
     if session is None:
         session = AgentSession(estimate_id=estimate_id, mode="chat", created_by=user_id)
@@ -311,19 +330,27 @@ def stream_agent(db: Session, estimate_id: uuid.UUID, session_id: uuid.UUID | No
     gw = get_gateway()
     reply = ""
     tool_calls: list[dict] = []
+    if model is None and gw.mode == "replay":
+        model = _cassette_for(db, estimate_id, text)
     try:
-        if gw.mode in ("live", "record"):
+        if model is not None or gw.mode in ("live", "record"):
             from langchain.agents import create_agent
-            from langchain_core.messages import AIMessageChunk, ToolMessage
+            from langchain_core.messages import AIMessage, ToolMessage
 
-            agent = create_agent(gw.chat_model(), tools=tools.all(), system_prompt=system_prompt(db, estimate_id))
+            agent = create_agent(model or gw.chat_model(), tools=tools.all(),
+                                 system_prompt=system_prompt(db, estimate_id))
             msgs = [{"role": m.role, "content": m.content} for m in history if m.role in ("user", "assistant")]
             msgs.append({"role": "user", "content": text})
-            for chunk, _meta in agent.stream({"messages": msgs}, stream_mode="messages"):
-                if isinstance(chunk, AIMessageChunk):
+            last_id = None
+            for chunk, _meta in agent.stream({"messages": msgs}, stream_mode="messages",
+                                             config={"callbacks": callbacks or []}):
+                if isinstance(chunk, AIMessage):  # chunks when streaming, whole messages otherwise
                     content = chunk.content if isinstance(chunk.content, str) else "".join(
                         c.get("text", "") for c in chunk.content if isinstance(c, dict))
                     if content:
+                        if last_id is not None and chunk.id != last_id and reply:
+                            content = "\n\n" + content  # separate text from successive model turns
+                        last_id = chunk.id
                         reply += content
                         yield sse("token", {"text": content})
                 elif isinstance(chunk, ToolMessage):

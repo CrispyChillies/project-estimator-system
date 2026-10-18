@@ -196,8 +196,14 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Est. cost</div>
+                <div className="text-xs text-muted-foreground">Est. cost (this DB)</div>
                 <div className="font-medium">${(usage?.cost_usd ?? 0).toFixed(4)}</div>
+              </div>
+              <div className="col-span-2">
+                <div className="text-xs text-muted-foreground">Live spend, all time (ledger) vs budget</div>
+                <div className="font-medium">
+                  ${(usage?.ledger_cost_usd ?? 0).toFixed(4)} of ${(usage?.budget_usd ?? 0).toFixed(2)}
+                </div>
               </div>
             </div>
             <p className="pt-2 text-xs text-muted-foreground">

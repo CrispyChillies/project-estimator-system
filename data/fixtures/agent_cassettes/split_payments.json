@@ -1,0 +1,122 @@
+{
+ "messages": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "list_tasks",
+     "args": {},
+     "id": "call_xXwsLomAyQ7zl4FHVjTJtJfb"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "propose_split_task",
+     "args": {
+      "task_ref": "6be397fe-9b23-4244-bc95-a7392a407ebb",
+      "parts": [
+       {
+        "title": "ERP integration \u2014 API and data mapping",
+        "min_hours": 10.45,
+        "max_hours": 17.4
+       },
+       {
+        "title": "ERP integration \u2014 synchronization and error handling",
+        "min_hours": 10.45,
+        "max_hours": 17.4
+       }
+      ],
+      "rationale": "Split the existing ERP integration scope into two reviewable workstreams while preserving its total estimated hours."
+     },
+     "id": "call_FZPanzpvps3sr7vb2SACPkRU"
+    }
+   ]
+  },
+  {
+   "content": "Proposed splitting **ERP integration** into two tasks:\n\n- API and data mapping: **10.5\u201317.5 hours**\n- Synchronization and error handling: **10.5\u201317.5 hours**\n\nThe proposal preserves the original total estimate.",
+   "tool_calls": []
+  }
+ ],
+ "id_titles": {
+  "6b631c21-a053-416b-b031-ea892aab9cd2": "Mobile app screens",
+  "cb7c82da-411f-497f-9ac0-d1d74737af12": "User dashboard UI",
+  "3c24abc0-74fc-49e5-8e1b-9bd7fdad594a": "Admin panel for users",
+  "6be397fe-9b23-4244-bc95-a7392a407ebb": "ERP integration",
+  "89bc1f9d-ef7b-4949-aebe-481eeec6f474": "Maps and geolocation integration",
+  "01e22b14-9e49-4b12-9892-2bdabf0fddce": "Email notifications",
+  "9def1388-6aa5-4e0b-b0bd-dc644253621f": "KPI reporting dashboard",
+  "5c8d3ee8-ceb2-4a2f-b262-593ad6e5b5ac": "Legacy data migration",
+  "93c1efc8-6516-4200-af06-455ad834bfb8": "GDPR compliance features",
+  "e1bcd14f-d4a5-428c-8d7a-d2001941f0aa": "UI design system and mockups",
+  "1ab4f021-c9b0-4d80-aed1-7b01c6bff908": "CI/CD pipeline",
+  "8d28fd5d-1d6b-4c97-bc62-342711c16d5f": "Environments setup (dev/staging/prod)",
+  "10897132-f0a9-4579-8e56-df4f79ab0021": "QA and regression testing",
+  "5fe2f4e8-ba26-45cb-a8b6-9a9e5ba9964d": "Code review",
+  "fd51d4c9-6314-4414-b722-e9cedcbc8e9a": "Project management and communication"
+ },
+ "prompt": "split the ERP integration task into two",
+ "sse_token_events": 52,
+ "sse_events": [
+  "session",
+  "tool",
+  "tool",
+  "proposal",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "proposal",
+  "done"
+ ]
+}

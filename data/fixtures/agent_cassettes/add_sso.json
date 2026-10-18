@@ -1,0 +1,108 @@
+{
+ "messages": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "list_tasks",
+     "args": {},
+     "id": "call_FyZqLe3rdNj6PUqwnVpkEmm7"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "propose_add_task",
+     "args": {
+      "title": "SSO integration",
+      "min_hours": 16,
+      "max_hours": 28,
+      "category_key": "security_compliance",
+      "role_name": "Backend",
+      "module_name": "Authentication",
+      "description": "Implement single sign-on authentication, including identity-provider configuration, login/callback flow, account mapping, and error handling.",
+      "rationale": "Adds the requested SSO scope under Authentication. Range assumes one standard OIDC/SAML provider; provider count and protocol requirements were not specified."
+     },
+     "id": "call_JwGDBxmWFwn68pr8GlpZ8PJ4"
+    }
+   ]
+  },
+  {
+   "content": "Proposed adding **SSO integration** under **Authentication**, estimated at **16\u201328 hours** for a Backend engineer. The estimate assumes one standard OIDC/SAML provider; the provider and protocol weren\u2019t specified.",
+   "tool_calls": []
+  }
+ ],
+ "id_titles": {
+  "1ad51897-6599-4677-9a93-bbd8d21714e0": "Mobile app screens",
+  "a9cbe168-3500-45d7-8d70-f062d110d78b": "User dashboard UI",
+  "4b771512-8344-4087-8552-cc8c8cd89635": "Admin panel for users",
+  "f8697c22-adbe-4dd4-b582-5767584b47e3": "ERP integration",
+  "4b9f1b36-83be-48b2-a3ea-d782e6553f3e": "Maps and geolocation integration",
+  "b935cf30-2c5c-4028-acfb-7f6812ad8fc5": "Email notifications",
+  "f0478e60-7bab-42a9-a6c7-67f26c5bc36c": "KPI reporting dashboard",
+  "6e7b0796-a340-44c4-8e29-b0caa02c2e8e": "Legacy data migration",
+  "29a9f253-be26-42c8-abbe-b02965f495f8": "GDPR compliance features",
+  "abd5ce3f-8cd4-45f9-ad04-c3bffa6b4324": "UI design system and mockups",
+  "af7b723f-5e1a-4387-b1df-34f85173eea1": "CI/CD pipeline",
+  "acd6e868-230f-4b7c-87f4-6c8432fab3ed": "Environments setup (dev/staging/prod)",
+  "723e3fee-6b5b-4d5a-bfe9-197cfa9d1b52": "QA and regression testing",
+  "2b14fadd-1153-42fc-8356-3969cd2c8456": "Code review",
+  "fff02085-95ef-446f-8e42-ac0e5a80b4ed": "Project management and communication"
+ },
+ "prompt": "add an SSO task under Authentication",
+ "sse_token_events": 44,
+ "sse_events": [
+  "session",
+  "tool",
+  "tool",
+  "proposal",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "token",
+  "proposal",
+  "done"
+ ]
+}

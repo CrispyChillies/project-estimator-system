@@ -190,7 +190,7 @@ export function AgentPanel({ estimateId, readOnly }: { estimateId: string; readO
       </div>
       <p className="text-xs text-muted-foreground">
         {offline
-          ? "LLM_MODE is not live: a deterministic command parser stands in for the LLM agent. "
+          ? "LLM_MODE is not live: recorded live conversations are replayed when the prompt matches, otherwise a deterministic command parser answers. "
           : ""}
         The agent never edits directly: every change is a reviewable proposal, logged when you accept or reject it.
       </p>

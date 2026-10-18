@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.errors import NotFound
 from app.db.models import (
     CalibrationRun,
@@ -16,6 +17,7 @@ from app.db.models import (
     User,
 )
 from app.db.session import get_db
+from app.llm import budget
 from app.llm.gateway import get_gateway
 from app.schemas import api as S
 from app.services import jobs
@@ -104,6 +106,7 @@ def llm_usage(db: Session = Depends(get_db)):
                     .group_by(LLMCall.purpose)).all()
     return S.LLMUsage(calls=agg[0], input_tokens=agg[1], output_tokens=agg[2], cost_usd=float(agg[3]), cache_hits=agg[4],
                       mode=gw.mode, model=gw.model, embedding_model=gw.embedding_model,
+                      ledger_cost_usd=budget.spend_fn(), budget_usd=get_settings().llm_budget_usd,
                       by_purpose=[{"purpose": p, "calls": c, "cost_usd": float(x)} for p, c, x in by])
 
 

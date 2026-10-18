@@ -21,7 +21,7 @@ def main(top_k: int = 5) -> None:
     hits, total, sims = 0, 0, []
     per_cat: Counter = Counter()
     per_cat_hit: Counter = Counter()
-    for i, (t, pid) in enumerate(items):
+    for t, pid in items:
         s = cosine_rank(t.embedding, m)
         order = [j for j in np.argsort(-s) if items[j][1] != pid][:top_k]
         same = sum(items[j][0].category == t.category for j in order)
