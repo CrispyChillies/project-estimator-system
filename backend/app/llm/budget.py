@@ -81,7 +81,7 @@ class Section:
     start: float
 
 
-_section: ContextVar[Section | None] = ContextVar("llm_budget_section", default=None)
+_sections: ContextVar[tuple[Section, ...]] = ContextVar("llm_budget_sections", default=())
 EPS = 1e-9
 spend_fn: Callable[[], float] = _db_spend  # swapped in tests
 
@@ -89,32 +89,32 @@ spend_fn: Callable[[], float] = _db_spend  # swapped in tests
 @contextmanager
 def budget(name: str, limit: float) -> Iterator[Section]:
     sec = Section(name, limit, spend_fn())
-    token = _section.set(sec)
+    token = _sections.set((*_sections.get(), sec))
     try:
         yield sec
     finally:
-        _section.reset(token)
+        _sections.reset(token)
 
 
 def current_section() -> str | None:
-    s = _section.get()
-    return s.name if s else None
+    s = _sections.get()
+    return s[-1].name if s else None
 
 
 def section_spent() -> float:
-    s = _section.get()
-    return spend_fn() - s.start if s else 0.0
+    s = _sections.get()
+    return spend_fn() - s[-1].start if s else 0.0
 
 
 def check(estimated: float = 0.0) -> None:
-    """Raise before a live call if the global cap or the active section budget would be hit."""
+    """Raise before a live call if the global cap or ANY active (nested) section budget would be hit."""
     total = spend_fn()
     cap = get_settings().llm_budget_usd
     if total + estimated >= cap - EPS:
         raise BudgetExceeded("session (LLM_BUDGET_USD)", total, cap)
-    s = _section.get()
-    if s and (total - s.start) + estimated >= s.limit - EPS:
-        raise BudgetExceeded(f"section '{s.name}'", total - s.start, s.limit)
+    for s in reversed(_sections.get()):
+        if (total - s.start) + estimated >= s.limit - EPS:
+            raise BudgetExceeded(f"section '{s.name}'", total - s.start, s.limit)
 
 
 def estimate_tokens(text: str) -> int:

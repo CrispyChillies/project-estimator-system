@@ -8,7 +8,7 @@ PROMPT_VERSIONS = {
     "decomposition": "decomposition-v1",
     "estimation": "estimation-v1",
     "lessons": "lessons-v1",
-    "chat_agent": "chat-agent-v1",
+    "chat_agent": "chat-agent-v2",
 }
 
 UNIT_DEFINITION = (

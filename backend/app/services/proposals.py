@@ -67,6 +67,10 @@ def _validate(db: Session, estimate_id: uuid.UUID, op_type: str, payload: dict) 
     if op_type == "bulk_adjust":
         for c in payload.get("changes", []):
             _task_in(db, estimate_id, c["task_id"])
+    if op_type == "remove_module":
+        m = db.get(Module, uuid.UUID(payload["module_id"]))
+        if m is None or m.estimate_id != estimate_id:
+            raise AppError("invalid_module", "Module not in this estimate", 422)
 
 
 def bulk_changes(db: Session, estimate_id: uuid.UUID, percent: float, role_name: str | None = None,
@@ -137,6 +141,8 @@ def _apply(db: Session, estimate_id: uuid.UUID, op: dict, actor: es.Actor) -> No
         for c in pl["changes"]:
             es.update_task(db, uuid.UUID(c["task_id"]), {"min_hours": c["new_min"], "max_hours": c["new_max"]}, actor,
                            reason_tag=pl.get("reason_tag"), reason_text=reason)
+    elif op["type"] == "remove_module":
+        es.remove_module(db, uuid.UUID(pl["module_id"]), actor)
     else:
         raise AppError("unknown_op", f"Unknown op type {op['type']}", 422)
 

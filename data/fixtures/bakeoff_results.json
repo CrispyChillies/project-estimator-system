@@ -1,0 +1,228 @@
+{
+ "A": {
+  "label": "A",
+  "model": "gpt-6-luna",
+  "reasoning": "none",
+  "model_key": "gpt-6-luna|estimation-v1|r=none",
+  "briefs": [
+   {
+    "brief": "small+ambiguous",
+    "seconds": 42.5,
+    "extraction": {
+     "citations": 12,
+     "invalid_citations": 0,
+     "uncited_requirements": 0,
+     "requirements": 12,
+     "attempts": 1
+    },
+    "tasks": 19,
+    "modules": 7,
+    "hidden_tasks": {
+     "ci_cd": true,
+     "qa": true,
+     "review": true,
+     "pm": true
+    },
+    "unknowns": 5,
+    "assumption_items": 13,
+    "unknown_questions": [
+     "Must card payments be implemented in phase 1, despite the note that payments are not needed?",
+     "Is Azure AD the client's identity provider, and is SSO required for the launch scope?",
+     "Should the mobile experience be a native/cross-platform app, or is a PWA acceptable?",
+     "Must regional managers be restricted to their own region, or may they see data across regions?",
+     "Is the required launch date six weeks away, or approximately three months away?"
+    ],
+    "median_task_cv": 0.083,
+    "total_spread": 0.196,
+    "total_mid": 1074.0,
+    "actual_planned": 347.6,
+    "ratio_to_actual": 3.09,
+    "summary_hint": "Build a retail e-commerce storefront with account access, dashboard, transactional email, mobile notifications, core mobile flows, responsive SEO-friendly public pages, and high-fidelity design. The b"
+   },
+   {
+    "brief": "medium",
+    "seconds": 38.6,
+    "extraction": {
+     "citations": 12,
+     "invalid_citations": 0,
+     "uncited_requirements": 0,
+     "requirements": 12,
+     "attempts": 1
+    },
+    "tasks": 19,
+    "modules": 7,
+    "hidden_tasks": {
+     "ci_cd": true,
+     "qa": true,
+     "review": true,
+     "pm": true
+    },
+    "unknowns": 4,
+    "assumption_items": 18,
+    "unknown_questions": [
+     "Does enterprise SSO require a non-standard identity-provider integration, custom provisioning, or multiple identity providers?",
+     "Are property listings and related data being migrated or imported from an existing system?",
+     "Do recurring billing and invoices require tax calculation, proration, dunning, or multiple plan tiers beyond basic Stripe subscriptions?",
+     "Are there specific legal, privacy, accessibility, or security compliance standards the site must meet?"
+    ],
+    "median_task_cv": 0.035,
+    "total_spread": 0.118,
+    "total_mid": 1071.5,
+    "actual_planned": 373.1,
+    "ratio_to_actual": 2.87,
+    "summary_hint": "Build a responsive, SEO-friendly real estate property listing site with public search, user accounts, a dashboard, admin content and product management, recurring billing, Stripe payments, and high-fi"
+   },
+   {
+    "brief": "large",
+    "seconds": 44.2,
+    "extraction": {
+     "citations": 16,
+     "invalid_citations": 0,
+     "uncited_requirements": 0,
+     "requirements": 16,
+     "attempts": 1
+    },
+    "tasks": 22,
+    "modules": 10,
+    "hidden_tasks": {
+     "ci_cd": true,
+     "qa": true,
+     "review": true,
+     "pm": true
+    },
+    "unknowns": 5,
+    "assumption_items": 16,
+    "unknown_questions": [
+     "Does image classification require training a new model using client-provided labeled data, rather than integrating an existing model or service?",
+     "Are native or cross-platform mobile applications required in addition to web screens?",
+     "Does the client have an ERP with documented APIs and accessible test credentials for the required order and stock exchanges?",
+     "Does the client require a specific identity provider or SSO protocol that is not supported by a standard integration?",
+     "Are the scanned document types and required extracted fields known, and is a representative sample available?"
+    ],
+    "median_task_cv": 0.109,
+    "total_spread": 0.256,
+    "total_mid": 1578.0,
+    "actual_planned": 420.5,
+    "ratio_to_actual": 3.75,
+    "summary_hint": "Build a donor management system for the non-profit sector, targeting launch in about three months. The brief lists OCR and image classification, search, native or cross-platform core flows, mapping, E"
+   }
+  ],
+  "agent": {
+   "commands": [
+    {
+     "command": "increase backend hours by 20%",
+     "tools": [
+      "list_tasks",
+      "propose_bulk_adjust"
+     ],
+     "correct": true,
+     "malformed_args": 0,
+     "errors": [],
+     "reply": "Proposed a 20% increase to all 8 Backend-role tasks. The change is pending review; the estimate hasn\u2019t been changed directly.",
+     "seconds": 4.5
+    },
+    {
+     "command": "add an SSO task under Authentication",
+     "tools": [
+      "list_tasks",
+      "propose_add_task"
+     ],
+     "correct": true,
+     "malformed_args": 0,
+     "errors": [],
+     "reply": "Proposed adding **Enterprise identity provider SSO integration** under **Authentication & Enterprise SSO**, estimated at **24\u201360 hours** for a Backend engineer. The proposal is ready for review.",
+     "seconds": 4.9
+    },
+    {
+     "command": "remove the admin dashboard module",
+     "tools": [
+      "list_tasks",
+      "propose_remove_module"
+     ],
+     "correct": true,
+     "malformed_args": 1,
+     "errors": [],
+     "reply": "There\u2019s no module named \u201cAdmin dashboard\u201d in this estimate. The closest is **Catalog & Content Administration**, which includes product and content editing. Did you mean to remove that module?",
+     "seconds": 5.6
+    },
+    {
+     "command": "split the payments task into two",
+     "tools": [
+      "list_tasks",
+      "get_task_details",
+      "propose_split_task"
+     ],
+     "correct": true,
+     "malformed_args": 0,
+     "errors": [],
+     "reply": "Proposed splitting **Recurring billing and PDF invoice generation** into:\n\n- **Recurring billing plans and subscription handling:** 32\u201365 hours\n- **PDF invoice generation and billing-event lifecycle:** 16\u201330 hours\n\nThe total estimate remains 48\u201395 hours. The proposal is pending review.",
+     "seconds": 7.5
+    },
+    {
+     "command": "why is the integration task so high?",
+     "tools": [
+      "list_tasks",
+      "get_task_details",
+      "get_task_details",
+      "explain_task",
+      "explain_task",
+      "find_similar_past_tasks",
+      "find_similar_past_tasks"
+     ],
+     "correct": true,
+     "malformed_args": 0,
+     "errors": [],
+     "reply": "There are two integration tasks, and both have relatively wide ranges because they depend on external systems:\n\n- **Enterprise SSO: 24\u201360 hours.** The identity provider and protocol aren\u2019t specified, and the work includes validating access and configuration with the client. That uncertainty drives t",
+     "seconds": 8.0
+    },
+    {
+     "command": "find similar past tasks for the reporting module",
+     "tools": [
+      "list_tasks",
+      "find_similar_past_tasks"
+     ],
+     "correct": true,
+     "malformed_args": 0,
+     "errors": [],
+     "reply": "I found no similar finalized or delivered past tasks for the reporting module. The closest current-estimate task is **Dashboard and search data APIs** (48\u201390 hours), but it isn\u2019t a past-task match.",
+     "seconds": 4.1
+    },
+    {
+     "command": "set QA tasks to at least 8 hours",
+     "tools": [
+      "list_tasks",
+      "propose_update_task"
+     ],
+     "correct": true,
+     "malformed_args": 0,
+     "errors": [],
+     "reply": "The only QA task, \u201cQA and regression testing,\u201d is already estimated at 55\u2013100 hours, so it exceeds the 8-hour minimum. I submitted a proposal that leaves its estimate unchanged.",
+     "seconds": 4.7
+    },
+    {
+     "command": "make it cheaper",
+     "tools": [
+      "list_tasks"
+     ],
+     "correct": true,
+     "malformed_args": 0,
+     "errors": [],
+     "reply": "What scope or quality trade-off are you willing to make to reduce the estimate? I won\u2019t cut scope without your direction.What scope or quality trade-off are you willing to make to reduce the estimate? I won\u2019t cut scope without your direction.",
+     "seconds": 3.3
+    }
+   ],
+   "correct": 8,
+   "total": 8,
+   "malformed": 1,
+   "estimate_mutated_without_accept": false
+  },
+  "structured_calls": 15,
+  "schema_invalid": 0,
+  "latency_ms_p50": 2173,
+  "latency_ms_p95": 15917,
+  "cost_usd_generation": 0.0028,
+  "cost_usd_agent": 0.0021,
+  "cost_usd_total": 0.0107,
+  "reasoning_tokens": 0
+ }
+}

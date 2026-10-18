@@ -3,6 +3,7 @@ Tools are read-only or proposal-creating; they NEVER mutate the estimate."""
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import math
@@ -10,6 +11,7 @@ import re
 import uuid
 from collections.abc import Iterator
 
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -34,6 +36,12 @@ log = logging.getLogger(__name__)
 
 def sse(event: str, data: object) -> str:
     return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
+
+
+class SplitPart(BaseModel):
+    title: str
+    min_hours: float
+    max_hours: float
 
 
 class AgentTools:
@@ -154,14 +162,32 @@ class AgentTools:
                        summary=f"Remove '{t.title}'", rationale=rationale)
         return f"Proposed op {op['id']}"
 
-    def propose_split_task(self, task_ref: str, parts_json: str, rationale: str = "") -> str:
-        """Propose splitting a task. parts_json: JSON list of {title, min_hours, max_hours}."""
+    def propose_split_task(self, task_ref: str, parts: list[SplitPart], rationale: str = "") -> str:
+        """Propose splitting a task into parts (title, min_hours, max_hours). Totals are kept equal to the original."""
         t = self._find(task_ref)
         if not t:
             return "Task not found."
-        parts = json.loads(parts_json)
-        op = pr.add_op(self.db, self._proposal(), "split_task", {"task_id": str(t.id), "title": t.title, "parts": parts},
-                       summary=f"Split '{t.title}' into {len(parts)} tasks", rationale=rationale)
+        items = [p if isinstance(p, SplitPart) else SplitPart.model_validate(p) for p in parts]
+        if len(items) < 2:
+            return "A split needs at least two parts."
+        smin = sum(p.min_hours for p in items) or 1.0
+        smax = sum(p.max_hours for p in items) or 1.0
+        scaled = [{"title": p.title, "min_hours": max(0.25, round(p.min_hours * t.min_hours / smin * 2) / 2),
+                   "max_hours": max(0.5, round(p.max_hours * t.max_hours / smax * 2) / 2)} for p in items]
+        op = pr.add_op(self.db, self._proposal(), "split_task", {"task_id": str(t.id), "title": t.title, "parts": scaled,
+                                                                 "before": {"min_hours": t.min_hours, "max_hours": t.max_hours}},
+                       summary=f"Split '{t.title}' into {len(scaled)} tasks (total hours preserved)", rationale=rationale)
+        return f"Proposed op {op['id']}: {scaled}"
+
+    def propose_remove_module(self, module_name: str, rationale: str = "") -> str:
+        """Propose removing a whole module (and its tasks) by module name."""
+        words = set(T.tokens(module_name))
+        mods = list(self.db.scalars(select(Module).where(Module.estimate_id == self.estimate_id, Module.removed.is_(False))))
+        best = max(mods, key=lambda m: len(words & set(T.tokens(m.name))), default=None)
+        if best is None or not words & set(T.tokens(best.name)):
+            return f"No module matches '{module_name}'. Modules: {[m.name for m in mods]}"
+        op = pr.add_op(self.db, self._proposal(), "remove_module", {"module_id": str(best.id), "title": best.name},
+                       summary=f"Remove module '{best.name}'", rationale=rationale)
         return f"Proposed op {op['id']}"
 
     def propose_bulk_adjust(self, percent: float, role_name: str | None = None, category_key: str | None = None,
@@ -183,9 +209,23 @@ class AgentTools:
         return f"Proposed op {op['id']}"
 
     def all(self) -> list:
-        return [self.list_tasks, self.get_task_details, self.explain_task, self.find_similar_past_tasks,
-                self.propose_add_task, self.propose_update_task, self.propose_remove_task, self.propose_split_task,
-                self.propose_bulk_adjust, self.propose_add_module]
+        fns = [self.list_tasks, self.get_task_details, self.explain_task, self.find_similar_past_tasks,
+               self.propose_add_task, self.propose_update_task, self.propose_remove_task, self.propose_split_task,
+               self.propose_bulk_adjust, self.propose_add_module, self.propose_remove_module]
+        return [_safe(f) for f in fns]
+
+
+def _safe(fn):
+    """Return tool errors to the model as text instead of aborting the agent run."""
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            return f"Tool error: {getattr(e, 'message', None) or type(e).__name__}"
+
+    return wrapper
 
 
 def system_prompt(db: Session, estimate_id: uuid.UUID) -> str:

@@ -59,13 +59,19 @@ def test_section_budget_is_relative_to_section_start(ledger):
     budget.check()  # outside the section only the global cap applies
 
 
-def test_nested_sections_innermost_wins(ledger):
-    with budget.budget("outer", 0.9):
+def test_nested_sections_all_enforced(ledger):
+    with budget.budget("outer", 0.15):
         with budget.budget("inner", 0.1):
             ledger.spent = 0.1
-            with pytest.raises(budget.BudgetExceeded):
+            with pytest.raises(budget.BudgetExceeded) as e:
                 budget.check()
+            assert "inner" in e.value.message
         budget.check()
+        with budget.budget("inner2", 0.5):
+            ledger.spent = 0.15
+            with pytest.raises(budget.BudgetExceeded) as e:
+                budget.check()
+            assert "outer" in e.value.message
 
 
 def test_live_call_refused_before_network_when_over_budget(ledger, monkeypatch):

@@ -24,6 +24,8 @@ from app.prompts import PROMPT_VERSIONS, render
 
 UNCERTAIN = re.compile(r"\?|\b(maybe|possibly|might|tbd|not sure|optional|later|nice to have|perhaps)\b", re.I)
 REQ_HINT = re.compile(r"^\s*([-*•]|\d+[.)])|\b(should|must|need|needs|want|wants|will|require|allow)\b", re.I)
+# Per-run diagnostics read by the model bake-off (first-attempt citation validity).
+EXTRACTION_STATS: list[dict] = []
 
 
 def _sentences(text: str) -> list[str]:
@@ -91,7 +93,14 @@ def run_extraction(chunks: list[tuple[str, str]], categories: list[str], roles: 
         result = gw.structured("extraction", messages, ExtractionResult, prompt_version=PROMPT_VERSIONS["extraction"],
                                fake=lambda: fake_extraction(chunks), temperature=0.0, sample_idx=attempt)
         bad = [c for r in result.requirements for c in r.source_chunk_ids if c not in valid]
-        if not bad and all(r.source_chunk_ids for r in result.requirements):
+        uncited = sum(1 for r in result.requirements if not r.source_chunk_ids)
+        if attempt == 0:
+            EXTRACTION_STATS.append({"citations": sum(len(r.source_chunk_ids) for r in result.requirements),
+                                     "invalid_citations": len(bad), "uncited_requirements": uncited,
+                                     "requirements": len(result.requirements), "attempts": 1})
+        else:
+            EXTRACTION_STATS[-1]["attempts"] = 2
+        if not bad and not uncited:
             return result
         messages = [*messages, ("user", f"Invalid or missing chunk ids {bad[:5]}. Cite only: {sorted(valid)}.")]
     assert result is not None
