@@ -1,11 +1,25 @@
 "use client";
 
-import { DndContext, type DragEndEvent, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
-import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import {
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useMutation } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, GripVertical, HelpCircle, MessageCircle, RotateCcw, Trash2 } from "lucide-react";
-import { Fragment, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 
 import { ReasonChips } from "@/components/estimate/reason-chips";
 import { Badge } from "@/components/ui/badge";
@@ -30,8 +44,10 @@ const CONF: Record<string, string> = {
 
 function HoursInput({ value, disabled, onCommit, label }: { value: number; disabled: boolean; onCommit: (v: number) => void; label: string }) {
   const [draft, setDraft] = useState<string | null>(null);
+  const committed = useRef(false);
   const commit = () => {
-    if (draft === null) return;
+    if (draft === null || committed.current) return;
+    committed.current = true; // Enter then blur must not send the same PATCH twice
     const v = Number(draft);
     setDraft(null);
     if (!Number.isNaN(v) && v >= 0 && v !== value) onCommit(v);
@@ -43,7 +59,10 @@ function HoursInput({ value, disabled, onCommit, label }: { value: number; disab
       className="h-7 w-16 text-right tabular-nums"
       disabled={disabled}
       value={draft ?? String(value)}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(e) => {
+        committed.current = false;
+        setDraft(e.target.value);
+      }}
       onBlur={commit}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
@@ -309,7 +328,10 @@ export function EstimateTable({
   const readOnly = tree.estimate.status === "final";
   const estimateId = tree.estimate.id;
   const invalidate = useInvalidateEstimate();
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
   const [orders, setOrders] = useState<Record<string, string[]>>({});
   const reorder = useMutation({
     mutationFn: ({ moduleId, ids }: { moduleId: string; ids: string[] }) =>

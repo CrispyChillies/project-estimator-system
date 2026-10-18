@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bot, Check, Send, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -135,10 +135,14 @@ export function AgentPanel({ estimateId, readOnly }: { estimateId: string; readO
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState("chat");
   const sessionRef = useRef<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const { data: pending, refetch } = useProposals(estimateId);
   const { data: usage } = useLLMUsage();
   const offline = !!usage && !(["live", "record"] as string[]).includes(usage.mode);
   const invalidate = useInvalidateEstimate();
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: "end" });
+  }, [messages, pending]);
 
   const send = async (t: string) => {
     if (!t.trim() || busy) return;
@@ -225,6 +229,7 @@ export function AgentPanel({ estimateId, readOnly }: { estimateId: string; readO
           {pending?.map((p) => (
             <ProposalCard key={p.id} proposal={p} estimateId={estimateId} />
           ))}
+          <div ref={bottomRef} />
         </div>
       </ScrollArea>
       <form

@@ -40,7 +40,8 @@ function UserSwitcher() {
   const { userId, setUser } = useCurrentUser();
   const pms = useMemo(() => users?.filter((u) => u.email !== "history@calibr.local") ?? [], [users]);
   useEffect(() => {
-    if (!userId && pms.length) setUser(pms[0].id);
+    // also replaces a stale id (e.g. after a database reset) with the first demo PM
+    if (pms.length && (!userId || !pms.some((u) => u.id === userId))) setUser(pms[0].id);
   }, [userId, pms, setUser]);
   return (
     <Select

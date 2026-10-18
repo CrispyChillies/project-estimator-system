@@ -56,8 +56,14 @@ Full math and hyperparameters: [docs/LEARNING.md](docs/LEARNING.md).
 
 ## Screenshots
 
-_Placeholder — add screenshots of Projects, Estimate editor + Agent, "Why this number?", Insights and
-Backtest._
+Captured by the Playwright suite (`frontend/e2e`, backend in `LLM_MODE=replay`; data is synthetic).
+
+| | |
+|---|---|
+| ![Projects](docs/screenshots/projects.png) | ![Estimate editor](docs/screenshots/estimate.png) |
+| ![Agent with proposal](docs/screenshots/agent.png) | ![Why this number?](docs/screenshots/why-this-number.png) |
+| ![Actuals](docs/screenshots/actuals.png) | ![Insights](docs/screenshots/insights.png) |
+| ![Backtest](docs/screenshots/backtest.png) | ![Settings](docs/screenshots/settings.png) |
 
 ## Privacy & security notes
 

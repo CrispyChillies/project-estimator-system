@@ -1111,6 +1111,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/llm-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin Llm Usage
+         * @description Cumulative live spend vs LLM_BUDGET_USD (reasoning tokens are included in output tokens).
+         */
+        get: operations["admin_llm_usage_api_v1_admin_llm_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insights/model-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Model Status */
+        get: operations["model_status_api_v1_insights_model_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -1253,6 +1290,12 @@ export interface components {
              * @enum {string}
              */
             protocol: "loo" | "chronological";
+            /**
+             * Data Source
+             * @default synthetic
+             * @enum {string}
+             */
+            data_source: "synthetic" | "dataset";
         };
         /** BacktestRunOut */
         BacktestRunOut: {
@@ -1565,6 +1608,16 @@ export interface components {
             model: string;
             /** Embedding Model */
             embedding_model: string;
+            /**
+             * Ledger Cost Usd
+             * @default 0
+             */
+            ledger_cost_usd: number;
+            /**
+             * Budget Usd
+             * @default 0
+             */
+            budget_usd: number;
             /** By Purpose */
             by_purpose: {
                 [key: string]: unknown;
@@ -4311,6 +4364,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LLMUsage"];
+                };
+            };
+        };
+    };
+    admin_llm_usage_api_v1_admin_llm_usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    model_status_api_v1_insights_model_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

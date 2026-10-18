@@ -262,7 +262,7 @@ export function EstimateTab({
   );
 
   const main = (
-    <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+    <div className={agent ? "grid gap-4" : "grid gap-4 xl:grid-cols-[1fr_320px]"}>
       <div className="min-w-0 overflow-x-auto">
         {isLoading || !tree || !roles || !categories ? (
           <Skeleton className="h-96" />
@@ -288,7 +288,7 @@ export function EstimateTab({
       <ModelStatusBanner />
       {toolbar}
       {agent && estimateId ? (
-        <ResizablePanelGroup orientation="horizontal" className="min-h-[640px] rounded-lg border">
+        <ResizablePanelGroup orientation="horizontal" className="h-[calc(100vh-11rem)] min-h-[560px] rounded-lg border">
           <ResizablePanel defaultSize="68%" minSize="40%">
             <div className="h-full overflow-auto p-3">{main}</div>
           </ResizablePanel>
