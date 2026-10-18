@@ -62,7 +62,16 @@ def _db_spend(section: str | None = None) -> float:
     if section:
         q = q.where(LLMCall.section == section)
     with SessionLocal() as db:
-        return float(db.scalar(q) or 0.0)
+        return float(db.scalar(q) or 0.0) + unlogged_spend
+
+
+# Cost of live calls whose llm_calls row could not be written; still counts against the cap.
+unlogged_spend = 0.0
+
+
+def record_unlogged(cost: float) -> None:
+    global unlogged_spend
+    unlogged_spend += cost
 
 
 @dataclass

@@ -118,7 +118,8 @@ class LLMGateway:
             with SessionLocal() as db:
                 db.add(LLMCall(**kw))
                 db.commit()
-        except Exception:  # logging must never break the main flow
+        except Exception:  # logging must never break the main flow, but spend must never be lost
+            budget.record_unlogged(float(kw.get("cost_usd") or 0.0))
             log.exception("failed to log llm call")
 
     def _require_live(self) -> None:
