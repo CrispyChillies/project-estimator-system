@@ -212,3 +212,8 @@ Short log of choices made where the brief was ambiguous or reality forced a devi
 64. **Vercel project** `project-calibrate` (the requested `calibrate.vercel.app` belongs to another account).
     `BACKEND_URL=https://project-calibrate-api.onrender.com` and `PUBLIC_APP_URL` are set for Production;
     `ROBOTS_INDEX` stays off until the owner decides to allow indexing.
+65. **Quick sign-in (client request: no authentication for users).** `AUTH_MODE=quick` replaces accounts for
+    members with a name (+ optional email to resume) → a normal session cookie, so per-user ownership, CSRF and
+    per-user AI caps keep working. Admin accounts can never be entered this way (403); the admin keeps a
+    password. Password sign-up is closed in this mode. Trade-off: anyone with an email can open that member's
+    projects, and new guests can be created freely — the global `LLM_BUDGET_USD` cap bounds total spend.

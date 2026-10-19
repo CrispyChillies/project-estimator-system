@@ -269,3 +269,24 @@ def test_member_pool_excludes_archive_unless_enabled(db, two_members):
     sim = a.get(f"/api/v1/estimates/{eid}/similar-projects").json()["references"]
     assert [r["project_id"] for r in sim] == [str(arch.id)]
     assert a.get("/api/v1/insights/scope").json()["includes_reference_library"] is True
+
+
+def test_quick_signin_mode(db, monkeypatch):
+    from app.core.config import get_settings
+    from app.main import app
+
+    with TestClient(app) as c:
+        c.get("/api/v1/auth/csrf")
+        assert c.post("/api/v1/auth/quick", json={"name": "Q"}, headers=_h(c)).status_code == 403
+        monkeypatch.setattr(get_settings(), "auth_mode", "quick")
+        r = c.post("/api/v1/auth/quick", json={"name": "Quinn", "email": "quinn@example.com"}, headers=_h(c))
+        assert r.status_code == 200 and r.json()["role"] == "member"
+        assert c.get("/api/v1/projects").status_code == 200
+        c.post("/api/v1/auth/logout", headers=_h(c))
+        again = c.post("/api/v1/auth/quick", json={"name": "Quinn", "email": "quinn@example.com"}, headers=_h(c))
+        assert again.json()["id"] == r.json()["id"]
+        assert c.post("/api/v1/auth/quick", json={"name": "Guest"}, headers=_h(c)).json()["email"].startswith("guest-")
+    _user(db, "boss@example.com", role="admin")
+    with TestClient(app) as c:
+        c.get("/api/v1/auth/csrf")
+        assert c.post("/api/v1/auth/quick", json={"name": "x", "email": "boss@example.com"}, headers=_h(c)).status_code == 403

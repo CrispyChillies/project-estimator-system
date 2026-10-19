@@ -50,6 +50,11 @@ class OnboardingIn(BaseModel):
     state: dict
 
 
+class QuickIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    email: str | None = Field(None, max_length=200)
+
+
 def me_out(u: User) -> dict:
     return {"id": str(u.id), "name": u.name, "email": u.email, "role": u.role,
             "onboarding_state": u.onboarding_state or {}, "last_login_at": u.last_login_at}
@@ -74,7 +79,27 @@ def csrf(request: Request, response: Response) -> dict:
 
 @router.get("/config")
 def config() -> dict:
-    return {"signup_mode": get_settings().signup_mode}
+    return {"signup_mode": get_settings().signup_mode, "auth_mode": get_settings().auth_mode}
+
+
+@router.post("/quick")
+def quick_signin(body: QuickIn, request: Request, response: Response, db: Session = Depends(get_db)) -> dict:
+    """AUTH_MODE=quick: no password. Reusing an email resumes that member's account; admins must use a password."""
+    if get_settings().auth_mode != "quick":
+        raise AppError("quick_disabled", "Quick sign-in is not enabled", 403)
+    key = A.throttle_key(request, "quick")
+    A.check_throttle(db, key)
+    email = (body.email or "").strip().lower()
+    user = db.scalar(select(User).where(func.lower(User.email) == email)) if email else None
+    if user is not None and (user.role == "admin" or user.archived or not user.is_active):
+        raise AppError("password_required", "This account signs in with a password", 403)
+    if user is None:
+        user = User(name=body.name.strip(), email=email or f"guest-{uuid.uuid4().hex[:12]}@guest.calibr",
+                    role="member", is_active=True, onboarding_state={})
+        db.add(user)
+        db.flush()
+    A.record_attempt(db, key, True)
+    return _login(db, request, response, user)
 
 
 @router.post("/signup", status_code=201)

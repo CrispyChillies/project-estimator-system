@@ -51,10 +51,10 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
+      - key: AUTH_MODE
+        value: quick # members enter a name (no password); the admin still signs in with a password
       - key: SIGNUP_MODE
-        value: invite
-      - key: INVITE_CODE
-        sync: false
+        value: closed
       - key: PUBLIC_APP_URL
         value: https://project-calibrate.vercel.app
       - key: CORS_ORIGINS

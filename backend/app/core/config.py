@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     admin_email: str = ""
     admin_password: str = ""
     signup_mode: str = "invite"  # open | invite | closed
+    # password = normal accounts; quick = members just enter a name (no password); admins still use a password
+    auth_mode: str = "password"
     invite_code: str = ""
     public_app_url: str = "http://localhost:3000"
     robots_index: bool = False

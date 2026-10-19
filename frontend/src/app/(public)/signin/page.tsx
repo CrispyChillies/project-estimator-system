@@ -1,6 +1,6 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -66,6 +66,64 @@ function SignInForm() {
   );
 }
 
+function QuickForm({ onPassword }: { onPassword: () => void }) {
+  const params = useSearchParams();
+  const qc = useQueryClient();
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const me = await api("/auth/quick", { method: "POST", json: { name, email: email || null } });
+      qc.setQueryData(meKey, me);
+      router.replace(safeNext(params.get("next")));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not sign in. Try again.");
+      setBusy(false);
+    }
+  };
+  return (
+    <form onSubmit={submit} className="space-y-3" noValidate>
+      <div className="space-y-1.5">
+        <Label htmlFor="name">Your name</Label>
+        <Input id="name" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="email">Email (optional)</Label>
+        <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <p className="text-xs text-muted-foreground">Use the same email next time to get back to your projects.</p>
+      </div>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      <Button type="submit" className="w-full" disabled={busy || !name.trim()}>
+        {busy ? "Opening…" : "Continue"}
+      </Button>
+      <button type="button" className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:underline" onClick={onPassword}>
+        Administrator? Sign in with a password
+      </button>
+    </form>
+  );
+}
+
+function SignIn() {
+  const { data: cfg } = useQuery({
+    queryKey: ["auth-config"],
+    queryFn: () => api<{ signup_mode: string; auth_mode: string }>("/auth/config"),
+    staleTime: 300_000,
+  });
+  const [password, setPassword] = useState(false);
+  if (!cfg) return null;
+  return cfg.auth_mode === "quick" && !password ? <QuickForm onPassword={() => setPassword(true)} /> : <SignInForm />;
+}
+
 export default function SignInPage() {
   return (
     <AuthCard
@@ -78,7 +136,7 @@ export default function SignInPage() {
       }
     >
       <Suspense>
-        <SignInForm />
+        <SignIn />
       </Suspense>
     </AuthCard>
   );

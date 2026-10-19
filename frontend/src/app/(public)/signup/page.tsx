@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AuthCard } from "@/components/auth-card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,13 @@ import { api, ApiError } from "@/lib/api";
 export default function SignUpPage() {
   const qc = useQueryClient();
   const router = useRouter();
-  const { data: cfg } = useQuery({ queryKey: ["auth-config"], queryFn: () => api<{ signup_mode: string }>("/auth/config") });
+  const { data: cfg } = useQuery({
+    queryKey: ["auth-config"],
+    queryFn: () => api<{ signup_mode: string; auth_mode: string }>("/auth/config"),
+  });
+  useEffect(() => {
+    if (cfg?.auth_mode === "quick") router.replace("/signin");
+  }, [cfg, router]);
   const [form, setForm] = useState({ name: "", email: "", password: "", invite_code: "" });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
