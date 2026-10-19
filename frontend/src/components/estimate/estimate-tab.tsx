@@ -1,11 +1,12 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bot, Copy, Download, GitCompare, Lock } from "lucide-react";
+import { Bot, Copy, Download, GitCompare, Loader2, Lock, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { EmptyState, ErrorState, ModelStatusBanner, StatusBadge } from "@/components/common";
+import { AddTaskDialog } from "@/components/estimate/add-task-dialog";
 import { AgentPanel } from "@/components/estimate/agent-panel";
 import { EstimateTable, type Highlight } from "@/components/estimate/estimate-table";
 import { SummaryPanel } from "@/components/estimate/summary-panel";
@@ -40,6 +41,7 @@ import {
   useRoles,
   useSummary,
 } from "@/hooks/queries";
+import { useEstimateJobs } from "@/hooks/estimate-jobs";
 import { api, downloadUrl } from "@/lib/api";
 import { factor } from "@/lib/format";
 import type { Estimate, ProposalOp, TaskOut } from "@/lib/types";
@@ -120,6 +122,17 @@ export function EstimateTab({
   const [compareWith, setCompareWith] = useState<string | null>(null);
   const [showRemoved, setShowRemoved] = useState(false);
   const qc = useQueryClient();
+  const { start: startEstimate, isEstimating } = useEstimateJobs();
+  const pendingIds = useMemo(
+    () =>
+      (tree?.modules ?? [])
+        .filter((m) => !m.removed)
+        .flatMap((m) => m.tasks ?? [])
+        .filter((t) => !t.baseline && t.origin !== "ai" && t.enabled && !t.removed && t.min_hours === 0 && t.max_hours === 0)
+        .map((t) => t.id),
+    [tree],
+  );
+  const estimatingBatch = !!estimateId && pendingIds.some((id) => isEstimating(estimateId, id));
 
   const highlight = useMemo(() => {
     const h: Highlight = {};
@@ -217,6 +230,15 @@ export function EstimateTab({
         </Label>
       </div>
       <div className="ml-auto flex items-center gap-2">
+        {!readOnly && tree && roles && categories && (
+          <AddTaskDialog estimateId={tree.estimate.id} modules={tree.modules} roles={roles} categories={categories} />
+        )}
+        {!readOnly && estimateId && pendingIds.length > 0 && (
+          <Button size="sm" onClick={() => void startEstimate(estimateId, pendingIds)} disabled={estimatingBatch}>
+            {estimatingBatch ? <Loader2 className="animate-spin" /> : <Sparkles />}
+            {estimatingBatch ? "Estimating…" : `AI estimate ${pendingIds.length} added task${pendingIds.length > 1 ? "s" : ""}`}
+          </Button>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button size="sm" variant="outline" />}>
             <Download /> Export

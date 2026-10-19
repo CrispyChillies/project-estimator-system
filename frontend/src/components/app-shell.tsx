@@ -4,12 +4,11 @@ import { BarChart3, FlaskConical, FolderKanban, Gauge, Moon, Settings, Sun } fro
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useCurrentUser } from "@/components/providers";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
   SidebarContent,
@@ -27,6 +26,11 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useUsers } from "@/hooks/queries";
+
+const SIDEBAR_DEFAULT = 260;
+const SIDEBAR_MIN = 200;
+const SIDEBAR_MAX = 400;
+const WIDTH_KEY = "calibr.sidebarWidth";
 
 const NAV = [
   { href: "/projects", label: "Projects", icon: FolderKanban },
@@ -80,13 +84,51 @@ function ThemeToggle() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [width, setWidth] = useState(SIDEBAR_DEFAULT);
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => {
+    const saved = Number(window.localStorage.getItem(WIDTH_KEY)); // UI preference only
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read preference after hydration
+    if (saved) setWidth(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, saved)));
+  }, []);
+  const startDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = width;
+    let latest = startW;
+    setDragging(true);
+    const move = (ev: PointerEvent) => {
+      latest = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, startW + ev.clientX - startX));
+      setWidth(latest);
+    };
+    const up = () => {
+      setDragging(false);
+      window.localStorage.setItem(WIDTH_KEY, String(latest));
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+  const onHandleKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const next = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, width + (e.key === "ArrowRight" ? 16 : -16)));
+    setWidth(next);
+    window.localStorage.setItem(WIDTH_KEY, String(next));
+  };
   return (
-    <SidebarProvider>
+    <SidebarProvider
+      style={{ "--sidebar-width": `${width}px` } as React.CSSProperties}
+      className={dragging ? "select-none **:transition-none!" : undefined}
+    >
       <Sidebar collapsible="icon">
         <SidebarHeader>
           <div className="flex items-center gap-2 px-2 py-1.5">
-            <Gauge className="size-5 shrink-0 text-primary" />
-            <span className="font-semibold tracking-tight group-data-[collapsible=icon]:hidden">Calibr</span>
+            <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
+              <Gauge className="size-5 shrink-0 text-primary" />
+              <span className="font-semibold tracking-tight">Calibr</span>
+            </div>
+            <SidebarTrigger className="ml-auto group-data-[collapsible=icon]:mx-auto" />
           </div>
         </SidebarHeader>
         <SidebarContent>
@@ -116,11 +158,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </p>
         </SidebarFooter>
         <SidebarRail />
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+          aria-valuemin={SIDEBAR_MIN}
+          aria-valuemax={SIDEBAR_MAX}
+          aria-valuenow={width}
+          tabIndex={0}
+          onPointerDown={startDrag}
+          onKeyDown={onHandleKey}
+          className="absolute inset-y-0 -right-1 z-30 hidden w-2 cursor-col-resize touch-none transition-colors hover:bg-primary/30 focus-visible:bg-primary/40 focus-visible:outline-none md:block group-data-[collapsible=icon]:hidden"
+        />
       </Sidebar>
       <SidebarInset>
         <header className="sticky top-0 z-20 flex h-12 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur">
-          <SidebarTrigger />
-          <Separator orientation="vertical" className="h-5" />
           <div className="ml-auto flex items-center gap-2">
             <UserSwitcher />
             <ThemeToggle />

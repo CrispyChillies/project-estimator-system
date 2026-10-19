@@ -18,7 +18,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useMutation } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, GripVertical, HelpCircle, MessageCircle, RotateCcw, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, GripVertical, HelpCircle, Loader2, MessageCircle, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import { Fragment, useRef, useState } from "react";
 
 import { ReasonChips } from "@/components/estimate/reason-chips";
@@ -30,6 +30,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { errorToast, useInvalidateEstimate, usePatchTask } from "@/hooks/queries";
+import { useEstimateJobs } from "@/hooks/estimate-jobs";
 import { api } from "@/lib/api";
 import type { Category, EstimateTree, ModuleOut, Role, TaskOut } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -94,6 +95,10 @@ function TaskRow({
 }) {
   const patch = usePatchTask(estimateId);
   const invalidate = useInvalidateEstimate();
+  const { start, isEstimating } = useEstimateJobs();
+  const estimating = isEstimating(estimateId, task.id);
+  const canEstimate = !readOnly && !task.baseline && task.origin !== "ai" && !task.removed;
+  const aiEstimated = !!(task.baseline?.provenance as { added_by_pm?: boolean } | undefined)?.added_by_pm;
   const [reason, setReason] = useState<number | null>(null);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id, disabled: readOnly });
   const del = useMutation({
@@ -149,6 +154,16 @@ function TaskRow({
             {task.origin !== "ai" && (
               <Badge variant="outline" className="text-[10px]">
                 {task.origin}
+              </Badge>
+            )}
+            {aiEstimated && (
+              <Badge variant="secondary" className="text-[10px]">
+                AI estimated
+              </Badge>
+            )}
+            {estimating && (
+              <Badge variant="outline" className="gap-1 text-[10px]">
+                <Loader2 className="size-3 animate-spin" /> estimating…
               </Badge>
             )}
           </div>
@@ -230,6 +245,24 @@ function TaskRow({
                   {task.comment_count}
                 </TooltipTrigger>
                 <TooltipContent>{task.comment_count} edit events</TooltipContent>
+              </Tooltip>
+            )}
+            {canEstimate && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label="AI estimate"
+                      disabled={estimating}
+                      onClick={() => void start(estimateId, [task.id])}
+                    />
+                  }
+                >
+                  <Sparkles />
+                </TooltipTrigger>
+                <TooltipContent>AI estimate (runs in the background)</TooltipContent>
               </Tooltip>
             )}
             <Tooltip>

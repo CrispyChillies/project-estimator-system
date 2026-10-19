@@ -178,11 +178,11 @@ def structural_signals(recs: list[ProjectRec]) -> dict:
     unplanned_share = []
     for r in recs:
         for t in r.tasks:
-            if t.raw_mid is not None:
+            if t.raw_mid is not None and t.origin == "ai":
                 ai_total[t.category] += 1
                 if t.final_mid is None:
                     removed[t.category] += 1
-            elif t.final_mid is not None:
+            elif t.origin != "ai" and t.final_mid is not None:
                 added[t.category] += 1
                 added_titles[(t.category, t.title)] += 1
             if t.final_mid is not None:

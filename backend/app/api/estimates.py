@@ -5,11 +5,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import current_user_id
+from app.core.errors import AppError
 from app.db.models import Assumption, Estimate
 from app.db.session import get_db
 from app.schemas import api as S
+from app.services import added_tasks, exports, jobs, sensitivity
 from app.services import estimates as es
-from app.services import exports, jobs, sensitivity
 from app.services.generation import generate
 from app.services.learning import finalize_estimate
 from app.services.summary import compute_summary, ensure_summary
@@ -168,6 +169,19 @@ def bulk(estimate_id: uuid.UUID, body: S.BulkIn, db: Session = Depends(get_db), 
             changes["max_hours"] = max(changes["min_hours"], round_half(t.max_hours * f))
         es.update_task(db, tid, changes, _actor(uid), reason_tag=body.reason_tag)
     _done(db, estimate_id)
+
+
+@router.post("/estimates/{estimate_id}/tasks/estimate", response_model=S.JobOut, status_code=202)
+def estimate_added(estimate_id: uuid.UUID, body: S.EstimateAddedIn, bg: BackgroundTasks, db: Session = Depends(get_db),
+                   uid=Depends(current_user_id)):
+    """Background AI estimate for added tasks (given ids, or every added task still at 0 h)."""
+    es.ensure_draft(db, estimate_id)
+    ids = added_tasks.pending_task_ids(db, estimate_id, body.task_ids)
+    if not ids:
+        raise AppError("nothing_to_estimate", "No added tasks need an AI estimate", 422)
+    job = jobs.create_job(db, "estimate_added_tasks")
+    bg.add_task(jobs.run_job, job.id, lambda s, progress: added_tasks.estimate_added_tasks(s, estimate_id, ids, uid, progress))
+    return job
 
 
 # ---- activity, questions, assumptions, export ----

@@ -7,6 +7,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getUserId, setUserId } from "@/lib/api";
+import { EstimateJobsProvider } from "@/hooks/estimate-jobs";
 
 interface UserCtx {
   userId: string | null;
@@ -37,7 +38,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <QueryClientProvider client={client}>
         <UserContext.Provider value={{ userId, setUser }}>
-          <TooltipProvider>{children}</TooltipProvider>
+          <TooltipProvider>
+            <EstimateJobsProvider>{children}</EstimateJobsProvider>
+          </TooltipProvider>
           <Toaster richColors position="bottom-right" />
         </UserContext.Provider>
       </QueryClientProvider>

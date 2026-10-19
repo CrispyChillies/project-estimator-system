@@ -234,6 +234,10 @@ class ModulePatch(BaseModel):
     name: str = Field(min_length=1, max_length=200)
 
 
+class EstimateAddedIn(BaseModel):
+    task_ids: list[uuid.UUID] = Field(default_factory=list)
+
+
 class ReorderIn(BaseModel):
     module_id: uuid.UUID
     task_ids: list[uuid.UUID]
