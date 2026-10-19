@@ -114,14 +114,24 @@ function QuickForm({ onPassword }: { onPassword: () => void }) {
 }
 
 function SignIn() {
-  const { data: cfg } = useQuery({
+  const { data: cfg, isError } = useQuery({
     queryKey: ["auth-config"],
     queryFn: () => api<{ signup_mode: string; auth_mode: string }>("/auth/config"),
     staleTime: 300_000,
+    retry: 1,
   });
   const [password, setPassword] = useState(false);
-  if (!cfg) return null;
-  return cfg.auth_mode === "quick" && !password ? <QuickForm onPassword={() => setPassword(true)} /> : <SignInForm />;
+  const quick = (cfg?.auth_mode ?? "quick") === "quick" && !password;
+  return (
+    <>
+      {isError && (
+        <p role="alert" className="mb-3 text-sm text-destructive">
+          Can&apos;t reach the server right now. It may be starting up — try again in a minute.
+        </p>
+      )}
+      {quick ? <QuickForm onPassword={() => setPassword(true)} /> : <SignInForm />}
+    </>
+  );
 }
 
 export default function SignInPage() {
