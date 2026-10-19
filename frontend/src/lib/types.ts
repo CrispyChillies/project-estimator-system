@@ -62,7 +62,10 @@ export interface Bucket {
   min: number;
   max: number;
   mid: number;
-  cost: number;
+  cost: number; // VND at the viewer's effective rates
+  cost_min?: number;
+  cost_max?: number;
+  role_id?: string | null;
 }
 
 export interface EstimateSummary {
@@ -70,8 +73,10 @@ export interface EstimateSummary {
   total_max: number;
   total_mid: number;
   task_count: number;
+  total_cost_min: number;
   total_cost_mid: number;
-  currency: string;
+  total_cost_max: number;
+  currency: string; // canonical currency of the figures ("VND"); display currency is a per-user preference
   by_module: Bucket[];
   by_role: Bucket[];
   simulation: Simulation;

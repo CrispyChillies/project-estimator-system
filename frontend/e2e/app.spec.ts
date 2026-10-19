@@ -141,7 +141,7 @@ test("actuals: inline edits, invalid CSV, unplanned work, mark delivered", async
 
 test("settings has no model controls; admin page holds learning, usage and archive", async () => {
   await page.goto("/settings");
-  const rate = page.getByRole("textbox", { name: /Hourly rate for/ }).first();
+  const rate = page.getByRole("textbox", { name: /Your hourly rate for/ }).first();
   await expect(rate).not.toHaveValue("");
   await rate.fill(String(Number(await rate.inputValue()) + 1));
   await rate.blur();

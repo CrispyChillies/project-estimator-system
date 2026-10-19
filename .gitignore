@@ -18,3 +18,5 @@ frontend/.vercel/
 
 # Admin archive contains the owner's test data; the repo is public, so it is restored from a local copy.
 deploy/seed/*.sql.gz
+
+marketing-video/

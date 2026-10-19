@@ -16,6 +16,7 @@ import {
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
+import { CurrencyToggle } from "@/components/currency-toggle";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
@@ -76,6 +77,10 @@ function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <div className="px-2 py-1.5 text-xs text-muted-foreground">{me.role === "admin" ? "Administrator" : "Member"}</div>
+        <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs text-muted-foreground">
+          <span>Currency</span>
+          <CurrencyToggle />
+        </div>
         <DropdownMenuItem render={<Link href="/profile" />}>
           <UserRound /> Profile
         </DropdownMenuItem>

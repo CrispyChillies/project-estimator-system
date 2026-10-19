@@ -12,6 +12,8 @@ export interface Me {
   role: "admin" | "member";
   onboarding_state: Record<string, unknown>;
   last_login_at: string | null;
+  display_currency: "VND" | "USD";
+  tag_colors: Record<string, string>;
 }
 
 export const meKey = ["me"] as const;

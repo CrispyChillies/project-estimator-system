@@ -7,6 +7,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   ComposedChart,
   ErrorBar,
   Line,
@@ -17,6 +18,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { useTagHex } from "@/components/tags";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -161,6 +163,7 @@ const prodCfg = { edits: { label: "Edits", color: "var(--chart-1)" } } satisfies
 
 export function ProductivityAnalytics() {
   const { data, isLoading } = useQuery({ queryKey: ["analytics"], queryFn: () => api<Analytics>("/insights/analytics") });
+  const tagHex = useTagHex();
   if (isLoading || !data) return <Skeleton className="h-96" />;
   const projNeed = `Needs at least ${data.min_projects} delivered projects with actual hours.`;
   const eva = data.estimate_vs_actual.rows.map((r) => ({ ...r, label: short(r.name), band: [r.min, r.max] }));
@@ -215,6 +218,9 @@ export function ProductivityAnalytics() {
               <ReferenceLine x={1} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Bar dataKey="ratio" fill="var(--color-ratio)" radius={2}>
+                {data.bias_by_category.rows.filter((r) => r.enough).map((r) => (
+                  <Cell key={r.label} fill={tagHex.category(r.label)} />
+                ))}
                 <ErrorBar dataKey="err" width={4} stroke="var(--foreground)" direction="x" />
               </Bar>
             </ComposedChart>
@@ -274,8 +280,16 @@ export function ProductivityAnalytics() {
                   <XAxis type="number" fontSize={9} />
                   <YAxis type="category" dataKey="label" fontSize={9} width={80} />
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="planned" fill="var(--color-planned)" radius={2} />
-                  <Bar dataKey="actual" fill="var(--color-actual)" radius={2} />
+                  <Bar dataKey="planned" fill="var(--color-planned)" radius={2}>
+                    {data.planned_vs_actual[k].slice(0, 8).map((r) => (
+                      <Cell key={r.label} fill={k === "by_role" ? tagHex.role(r.label) : tagHex.category(r.label)} fillOpacity={0.4} />
+                    ))}
+                  </Bar>
+                  <Bar dataKey="actual" fill="var(--color-actual)" radius={2}>
+                    {data.planned_vs_actual[k].slice(0, 8).map((r) => (
+                      <Cell key={r.label} fill={k === "by_role" ? tagHex.role(r.label) : tagHex.category(r.label)} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ChartContainer>
             ))}

@@ -217,3 +217,23 @@ Short log of choices made where the brief was ambiguous or reality forced a devi
     per-user AI caps keep working. Admin accounts can never be entered this way (403); the admin keeps a
     password. Password sign-up is closed in this mode. Trade-off: anyone with an email can open that member's
     projects, and new guests can be created freely — the global `LLM_BUDGET_USD` cap bounds total spend.
+
+66. **Money is canonical whole VND (Prompt 6).** Hourly rates are stored as integer VND (`delivery_roles.hourly_rate_vnd`);
+    USD is only a display/input conversion rounded to 1.000 ₫. Legacy `hourly_rate`/`currency` columns are untouched
+    (additive migration 0006). Persisted summaries store per-role hours; costs are recomputed per user at response time.
+67. **FX source and rate.** USD→VND looked up at implementation time from open.er-api.com: 25,869.40 (updated 19 Oct 2026
+    00:02 UTC). Stored as a workspace setting, admin-editable (`manual` never overwritten by the background refresh).
+    "Rates By Exchange Rate API" attribution is shown in the UI when the source starts with "auto".
+68. **VN rate card.** rate = median monthly gross × 0.015837 (1/(22 d × 8 h × ~0.8 util… see `docs/RATES_VN.md`), rounded to 10k ₫.
+    Designer rate (550k) is an assumption; sources and sanity checks are in `docs/RATES_VN.md`.
+69. **Per-user rate overrides and tag colours** live in new JSONB columns on `users` (`rate_overrides`, `tag_colors`);
+    `display_currency` is a CHECKed VND/USD column. No new tables.
+70. **`fit_to_cost_budget`** fits the cost of MAX hours to a target without exceeding it, in 0.5h steps, honouring floors and
+    locked tasks. Large changes still go through the existing 30% confirmation rule. Money text is parsed by
+    `services/money.parse_money` (VN units imply VND; bare numbers only ≥ 1000).
+71. **Fixed-height agent layout.** The estimate tab is a viewport-height flex layout; only the chat log scrolls, the composer is
+    pinned, auto-scroll pauses when the user scrolls up (Jump to latest). Tool cards collapse to one line. Below 1024px the
+    agent is a drawer. Panel layout persists in localStorage.
+72. **Tag colours** come from one token map (`lib/tags.ts` + backend `PALETTE`); every tag text/background pair is tested
+    ≥ 4.5:1; users can pick their own colour per role/category; charts reuse the same tokens.
+73. **Sign-in skeleton.** The sign-in page shows "Connecting…" until the auth config loads (up to 3 s) to avoid the form race.

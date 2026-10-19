@@ -1287,10 +1287,34 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update Role */
+        /**
+         * Update Role
+         * @description Admin: workspace default rate (and default colour) of a role.
+         */
         put: operations["update_role_api_v1_roles__role_id__put"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/rates/{rate_role}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set My Rate
+         * @description The signed-in user's own hourly rate for a role (used for their cost figures).
+         */
+        put: operations["set_my_rate_api_v1_me_rates__rate_role__put"];
+        post?: never;
+        /** Reset My Rate */
+        delete: operations["reset_my_rate_api_v1_me_rates__rate_role__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1323,6 +1347,63 @@ export interface paths {
         get?: never;
         /** Update Category */
         put: operations["update_category_api_v1_categories__category_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/colors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set My Color
+         * @description Per-user tag colour for a role or category (palette tokens only).
+         */
+        put: operations["set_my_color_api_v1_me_colors_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set My Preferences */
+        put: operations["set_my_preferences_api_v1_me_preferences_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Workspace Fx
+         * @description Workspace USD/VND rate (canonical money is VND).
+         */
+        get: operations["get_workspace_fx_api_v1_fx_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -1542,6 +1623,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/fx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Workspace Fx
+         * @description Admin: set the USD/VND workspace rate by hand (manual rates are never overwritten by auto-update).
+         */
+        put: operations["set_workspace_fx_api_v1_admin_fx_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/fx/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Workspace Fx
+         * @description Admin: fetch the current rate from the public provider now (explicit action; short timeout).
+         */
+        post: operations["refresh_workspace_fx_api_v1_admin_fx_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/csrf": {
         parameters: {
             query?: never;
@@ -1573,6 +1694,26 @@ export interface paths {
         get: operations["config_api_v1_auth_config_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/quick": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Quick Signin
+         * @description AUTH_MODE=quick: no password. Reusing an email resumes that member's account; admins must use a password.
+         */
+        post: operations["quick_signin_api_v1_auth_quick_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1646,6 +1787,26 @@ export interface paths {
         head?: never;
         /** Update Me */
         patch: operations["update_me_api_v1_auth_me_patch"];
+        trace?: never;
+    };
+    "/api/v1/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Session Status
+         * @description For public pages: 200 either way, so anonymous visitors do not produce 401 noise.
+         */
+        get: operations["session_status_api_v1_auth_session_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/auth/me/onboarding": {
@@ -1930,16 +2091,19 @@ export interface components {
             name: string;
             /** Description */
             description: string;
+            /** Color */
+            color: string;
+            /** Default Color */
+            default_color: string;
         };
         /** CategoryUpdate */
         CategoryUpdate: {
             /** Name */
-            name: string;
-            /**
-             * Description
-             * @default
-             */
-            description: string;
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Color */
+            color?: string | null;
         };
         /** ChunkOut */
         ChunkOut: {
@@ -1952,6 +2116,21 @@ export interface components {
             idx: number;
             /** Text */
             text: string;
+        };
+        /** ColorIn */
+        ColorIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "role" | "category";
+            /**
+             * Ref
+             * Format: uuid
+             */
+            ref: string;
+            /** Color */
+            color?: string | null;
         };
         /** CompareOut */
         CompareOut: {
@@ -2104,6 +2283,11 @@ export interface components {
             /** Modules */
             modules: components["schemas"]["ModuleOut"][];
         };
+        /** FxIn */
+        FxIn: {
+            /** Rate */
+            rate: number;
+        };
         /** GenerateIn */
         GenerateIn: {
             /** Document Ids */
@@ -2225,6 +2409,14 @@ export interface components {
             title: string;
             /** Text */
             text: string;
+        };
+        /** PrefsIn */
+        PrefsIn: {
+            /**
+             * Display Currency
+             * @enum {string}
+             */
+            display_currency: "VND" | "USD";
         };
         /** ProfileIn */
         ProfileIn: {
@@ -2438,6 +2630,13 @@ export interface components {
             /** Answer */
             answer: string | null;
         };
+        /** QuickIn */
+        QuickIn: {
+            /** Name */
+            name: string;
+            /** Email */
+            email?: string | null;
+        };
         /** ReasonIn */
         ReasonIn: {
             /** Reason Tag */
@@ -2471,19 +2670,30 @@ export interface components {
             id: string;
             /** Name */
             name: string;
-            /** Hourly Rate */
-            hourly_rate: number;
-            /** Currency */
-            currency: string;
             /** Color */
             color: string;
+            /** Default Color */
+            default_color: string;
+            /** Hourly Rate Vnd */
+            hourly_rate_vnd: number;
+            /** My Rate Vnd */
+            my_rate_vnd?: number | null;
+            /** Rate Vnd */
+            rate_vnd: number;
         };
-        /** RoleUpdate */
+        /**
+         * RoleUpdate
+         * @description Money is entered in either currency and converted to canonical VND once, on the server.
+         */
         RoleUpdate: {
-            /** Hourly Rate */
-            hourly_rate: number;
-            /** Currency */
-            currency: string;
+            /** Amount */
+            amount?: number | null;
+            /**
+             * Currency
+             * @default VND
+             * @enum {string}
+             */
+            currency: "VND" | "USD";
             /** Color */
             color?: string | null;
         };
@@ -4078,6 +4288,7 @@ export interface operations {
         parameters: {
             query?: {
                 format?: string;
+                currency?: string | null;
             };
             header?: never;
             path: {
@@ -5564,6 +5775,72 @@ export interface operations {
             };
         };
     };
+    set_my_rate_api_v1_me_rates__rate_role__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rate_role: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_my_rate_api_v1_me_rates__rate_role__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rate_role: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     categories_api_v1_categories_get: {
         parameters: {
             query?: never;
@@ -5615,6 +5892,98 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_my_color_api_v1_me_colors_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ColorIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_my_preferences_api_v1_me_preferences_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrefsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_workspace_fx_api_v1_fx_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -5990,6 +6359,63 @@ export interface operations {
             };
         };
     };
+    set_workspace_fx_api_v1_admin_fx_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FxIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_workspace_fx_api_v1_admin_fx_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     csrf_api_v1_auth_csrf_get: {
         parameters: {
             query?: never;
@@ -6030,6 +6456,41 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    quick_signin_api_v1_auth_quick_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuickIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6175,6 +6636,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    session_status_api_v1_auth_session_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

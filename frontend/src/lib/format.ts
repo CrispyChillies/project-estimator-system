@@ -13,11 +13,6 @@ export function pct(v: number | null | undefined, digits = 0, fromFraction = tru
   return `${(fromFraction ? v * 100 : v).toFixed(digits)}%`;
 }
 
-export function money(v: number | null | undefined, currency = "EUR"): string {
-  if (v === null || v === undefined) return "—";
-  return v.toLocaleString(undefined, { style: "currency", currency, maximumFractionDigits: 0 });
-}
-
 export function date(v: string | null | undefined): string {
   if (!v) return "—";
   return new Date(v).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
