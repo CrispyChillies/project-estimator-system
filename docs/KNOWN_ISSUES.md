@@ -9,3 +9,8 @@
 | 5 | `tsc` may report errors under `frontend/.next/dev/types` while a developer's own `next dev` is running. | Generated, stale type files only; `pnpm build` and `tsc` on sources pass. | Ignore, or restart the dev server. |
 | 6 | Inside Docker on a network with TLS inspection, outbound HTTPS to OpenAI fails certificate verification. | Local Docker only (seen during the rehearsal); not on Render. | Mount the host CA bundle and set `SSL_CERT_FILE` for local container runs. |
 | 7 | Quick sign-in (`AUTH_MODE=quick`) has no identity check by design. | Anyone who knows a member's email can open their projects; unlimited guests can be created (per-user caps reset per guest). | Total spend stays bounded by `LLM_BUDGET_USD`; switch back to `AUTH_MODE=password` when accounts are needed. |
+
+## Prompt 6
+- Live LLM spend for the post-deploy checks was not read back from the production ledger (admin password is not available to this session). Several estimate generations and three chat messages ran on the live model; expected to be a few cents, well under the USD 1.00 cap. Check Admin > Usage.
+- Designer hourly rate (550.000 ₫) is an assumption (no Vietnam-specific source); see `docs/RATES_VN.md`.
+- Test guest accounts/projects from the live pass remain in production.

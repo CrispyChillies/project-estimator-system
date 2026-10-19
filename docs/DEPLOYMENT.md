@@ -126,3 +126,12 @@ To go back to full accounts set `AUTH_MODE=password` and `SIGNUP_MODE=invite` + 
 * Frontend: `cd frontend && npx vercel deploy --prod` (or connect the Vercel project to the GitHub repo with
   root directory `frontend`).
 * Never point a production service at `LLM_MODE=fake`/`replay` — the API refuses to start.
+
+## Prompt 6 redeploy (VND, fixed-height agent panel, coloured tags)
+- Code SHA deployed: `386dec0` (pushed to `main`; Render and Vercel auto-deploy from Git).
+- Frontend: https://project-calibrate.vercel.app. API through the same-site proxy: https://project-calibrate.vercel.app/api/v1 (Render service behind it).
+- `/api/v1/ready` reports migration `0006` (applied on Render start; additive).
+- `make deploy-check URL=https://project-calibrate.vercel.app`: 14 passed, 0 failed, 1 skipped (password sign-in needs env vars).
+- Live Playwright pass (`e2e/live-prod.spec.ts`, 19 Oct 2026, ~23:05 UTC, 1280x720): quick sign-in as a new guest "Release check", real-model estimate, VND shown by default (cost-mid 285 triệu), USD toggle saved and persisted after reload, composer in view with the page not scrolling, real-model chat message "Reduce all backend tasks by 10%" changed the table, role tags rendered, sign-out. 1 passed.
+- The live pass created guest members and projects named "Release check…"/"curl check/curl proj" in the production database (test data, removable by the admin).
+- Render's small instance reset a few connections while estimate jobs ran; earlier live runs failed on that and on spec races (spec hardened), not on the app.
