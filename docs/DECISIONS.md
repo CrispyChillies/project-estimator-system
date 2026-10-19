@@ -109,3 +109,17 @@ Short log of choices made where the brief was ambiguous or reality forced a devi
     without references are byte-identical to before and existing replay fixtures still hit. In replay mode a
     cache miss on a context prompt (or on a new card embedding) degrades to `noctx` and records the reason,
     instead of failing offline demos.
+39. **Agent confirmation is turn-based**: a write that needs confirmation is stored as an
+    `awaiting_confirmation` operation, the run ends with `run_done{status: awaiting_confirmation}`, and the
+    confirm endpoint applies it later. No server-side waiting or resumable graph state is needed, and a reload
+    never loses a pending confirmation.
+40. **fit_to_budget floor**: a fitted task keeps at least 25% of its current max (min 0.5 h). Cutting deeper is a
+    scope decision, so the tool reports the feasible minimum and asks instead of squeezing tasks to 0.5 h.
+    Budget fitting targets the sum of **max** hours (the number a fixed-bid quote must stay under).
+41. **Split and merge are not "deletes"** for the always-confirm rule (hours are preserved); `delete_tasks` is.
+42. **Rolling summary is extractive (deterministic, free)**, not LLM-written: reproducible, no extra spend,
+    and it cannot inject instructions. Project memories are labelled with their origin; origin=document is
+    presented to the model as data only.
+43. **Slash commands bypass the LLM** in every mode and go through the deterministic planner, which also
+    serves fake/replay mode, so the offline demo exercises the same tools, policy and events as live mode.
+    The legacy proposal-based `/agent/messages` endpoint stays for the current UI until Phase 5 replaces it.

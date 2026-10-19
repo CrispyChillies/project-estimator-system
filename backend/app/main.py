@@ -6,7 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import actuals, agent, estimates, insights, projects, settings
+from app.api import actuals, agent, agent_panel, estimates, insights, projects, settings
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.logging import setup_logging
@@ -55,7 +55,8 @@ async def unhandled(_: Request, exc: Exception):
     return _err(500, "internal_error", "Internal server error")
 
 
-for r in (projects.router, estimates.router, agent.router, actuals.router, insights.router, settings.router):
+for r in (projects.router, estimates.router, agent.router, agent_panel.router, actuals.router, insights.router,
+          settings.router):
     app.include_router(r, prefix="/api/v1")
 
 

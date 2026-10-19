@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     # Reasoning effort sent to reasoning models (e.g. none/low); empty = omit the parameter.
     llm_reasoning_effort: str = ""
     llm_timeout_s: int = 120
+    agent_max_steps: int = 12
+    agent_max_ops_per_turn: int = 25
+    agent_confirm_delta_pct: float = 30.0
+    agent_history_token_budget: int = 6000
+    agent_recent_edit_minutes: int = 30
+    agent_run_lock_stale_s: int = 300
 
 
 @lru_cache

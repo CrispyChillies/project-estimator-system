@@ -43,7 +43,8 @@ def test_retrieval_respects_eligible_ids_threshold_and_k(db):
     ids = [r.project_id for r in refs]
     assert str(a.id) not in ids and ids[0] == str(b.id) and len(ids) <= 3
     # leakage guard: only explicitly eligible projects can come back
-    refs = pr.retrieve_projects(db, q, p, exclude_project_id=a.id, eligible_project_ids=[c.id])
+    refs = pr.retrieve_projects(db, "patient booking with sms reminders", p, exclude_project_id=a.id,
+                                eligible_project_ids=[c.id])
     assert [r.project_id for r in refs] == [str(c.id)]
     # never pad: a strict threshold returns fewer than k
     assert pr.retrieve_projects(db, q, LearningParams(retrieval_min_similarity=0.999), exclude_project_id=a.id) == []
