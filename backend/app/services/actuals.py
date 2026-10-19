@@ -98,12 +98,13 @@ def import_csv(db: Session, project_id: uuid.UUID, content: bytes, user_id: uuid
 
 
 def add_unplanned(db: Session, project_id: uuid.UUID, title: str, hours: float, category_id: uuid.UUID | None,
-                  note: str = "") -> UnplannedActual:
+                  note: str = "", reason: str = "unspecified") -> UnplannedActual:
     if db.get(Project, project_id) is None:
         raise NotFound("Project")
     if hours <= 0:
         raise AppError("invalid_hours", "hours must be > 0", 422)
-    u = UnplannedActual(project_id=project_id, title=title, hours=hours, category_id=category_id, note=note)
+    u = UnplannedActual(project_id=project_id, title=title, hours=hours, category_id=category_id, note=note,
+                        reason=reason)
     db.add(u)
     db.flush()
     return u

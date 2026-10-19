@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { errorToast, qk, useAccuracy, useActuals, useUnplanned } from "@/hooks/queries";
+import { HelpTip } from "@/components/onboarding";
 import { api, ApiError, downloadUrl } from "@/lib/api";
 import { hours, pct } from "@/lib/format";
 import type { Estimate, Project } from "@/lib/types";
@@ -34,6 +35,14 @@ function variance(min: number, max: number, actual: number | null) {
   return "text-emerald-600";
 }
 
+const REASON_LABEL: Record<string, string> = {
+  missed_requirement: "missed requirement",
+  clarified_scope: "clarified scope",
+  change_request: "change request",
+  other: "other",
+  unspecified: "no reason",
+};
+
 export function ActualsTab({ project, estimates }: { project: Project; estimates: Estimate[] }) {
   const hasFinal = estimates.some((e) => e.status === "final");
   const delivered = project.status === "delivered";
@@ -42,6 +51,7 @@ export function ActualsTab({ project, estimates }: { project: Project; estimates
   const { data: acc } = useAccuracy(project.id, hasFinal);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [title, setTitle] = useState("");
+  const [reason, setReason] = useState("missed_requirement");
   const [uh, setUh] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
@@ -81,7 +91,7 @@ export function ActualsTab({ project, estimates }: { project: Project; estimates
     },
   });
   const addUnplanned = useMutation({
-    mutationFn: () => api(`/projects/${project.id}/unplanned`, { method: "POST", json: { title, hours: Number(uh) } }),
+    mutationFn: () => api(`/projects/${project.id}/unplanned`, { method: "POST", json: { title, hours: Number(uh), reason } }),
     onSuccess: () => {
       setTitle("");
       setUh("");
@@ -216,13 +226,18 @@ export function ActualsTab({ project, estimates }: { project: Project; estimates
         </Card>
         <Card size="sm">
           <CardHeader>
-            <CardTitle>Unplanned work</CardTitle>
+            <CardTitle className="flex items-center gap-1">
+              Unplanned work
+              <HelpTip label="unplanned work" href="/help/closing-the-loop#unplanned" text="Work that was not in the quote. Recorded separately with a reason so it does not distort estimation error." />
+            </CardTitle>
             <CardDescription>Scope creep never in the estimate — tracked separately.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {unplanned?.map((u) => (
               <div key={u.id} className="flex items-center justify-between text-sm">
-                <span>{u.title}</span>
+                <span>
+                  {u.title} <span className="text-xs text-muted-foreground">· {REASON_LABEL[u.reason ?? "unspecified"]}</span>
+                </span>
                 <span className="flex items-center gap-1 tabular-nums">
                   {hours(u.hours)}
                   <Button variant="ghost" size="icon-xs" aria-label="Delete" onClick={() => delUnplanned.mutate(u.id)}>
@@ -232,7 +247,18 @@ export function ActualsTab({ project, estimates }: { project: Project; estimates
               </div>
             ))}
             <div className="flex gap-1.5">
-              <Input className="h-8" placeholder="What was done" value={title} onChange={(e) => setTitle(e.target.value)} />
+              <Input className="h-8" placeholder="What was done" aria-label="Unplanned work description" value={title} onChange={(e) => setTitle(e.target.value)} />
+              <select
+                className="h-8 rounded-md border bg-background px-1.5 text-xs"
+                aria-label="Reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              >
+                <option value="missed_requirement">Missed requirement</option>
+                <option value="clarified_scope">Clarified scope</option>
+                <option value="change_request">Change request</option>
+                <option value="other">Other</option>
+              </select>
               <Input className="h-8 w-20" placeholder="h" inputMode="decimal" value={uh} onChange={(e) => setUh(e.target.value)} />
               <Button size="icon-sm" aria-label="Add" onClick={() => addUnplanned.mutate()} disabled={!title || !Number(uh)}>
                 <Plus />

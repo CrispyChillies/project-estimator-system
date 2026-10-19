@@ -29,6 +29,7 @@ class UnplannedActual(IdMixin, TimestampMixin, Base):
     category_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("task_categories.id"))
     hours: Mapped[float] = mapped_column(Float)
     note: Mapped[str] = mapped_column(Text, default="")
+    reason: Mapped[str] = mapped_column(String(30), default="unspecified", server_default="unspecified")
 
 
 class CalibrationStat(IdMixin, TimestampMixin, Base):

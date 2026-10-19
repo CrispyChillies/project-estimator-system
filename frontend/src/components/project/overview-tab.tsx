@@ -118,6 +118,22 @@ function GenerateDialog({ project, docs, onGenerated }: { project: Project; docs
   );
 }
 
+const EXAMPLE_BRIEF = `Field service app for an HVAC maintenance company
+
+Goals
+- Customers book maintenance visits online and see technician arrival windows.
+- Dispatchers plan daily routes for 25 technicians and reassign jobs when someone is sick.
+- Technicians use a mobile app (offline capable) to see jobs, record parts used and capture a customer signature.
+
+Integrations
+- Existing accounting system (invoices are created there), via its REST API.
+- SMS reminders the day before a visit.
+
+Constraints
+- Web back office plus iOS and Android apps.
+- Single sign-on for staff with Microsoft 365.
+- Go live before the winter season (about 4 months).`;
+
 function PasteDialog({ projectId }: { projectId: string }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("pasted-brief");
@@ -144,7 +160,10 @@ function PasteDialog({ projectId }: { projectId: string }) {
         </DialogHeader>
         <div className="space-y-2">
           <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-          <Textarea rows={14} value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste client notes…" />
+          <Textarea rows={14} value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste client notes…" aria-label="Brief text" />
+          <button type="button" className="text-xs text-primary underline underline-offset-4" onClick={() => setText(EXAMPLE_BRIEF)}>
+            Paste an example brief
+          </button>
         </div>
         <DialogFooter>
           <Button onClick={() => paste.mutate()} disabled={text.trim().length < 20 || paste.isPending}>

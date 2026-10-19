@@ -7,6 +7,7 @@ import {
   FolderKanban,
   LayoutDashboard,
   LifeBuoy,
+  ListChecks,
   LogOut,
   Moon,
   Settings,
@@ -67,7 +68,7 @@ function UserMenu() {
   if (!me) return null;
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="gap-2" aria-label="Account menu" />}>
+      <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="gap-2" aria-label="Account menu" data-tour="account-menu" />}>
         <span className="flex size-6 items-center justify-center rounded-full bg-primary/15 text-xs font-medium text-primary">
           {me.name.slice(0, 1).toUpperCase()}
         </span>
@@ -81,9 +82,12 @@ function UserMenu() {
         <DropdownMenuItem render={<Link href="/help" />}>
           <LifeBuoy /> Help & guides
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => update({ checklist_dismissed: false })} render={<Link href="/dashboard" />}>
+          <ListChecks /> Getting started checklist
+        </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => {
-            update({ tour_done: false, tour_step: 0 });
+            update({ tour_done: false, tour_step: 0, welcome_seen: true });
             router.push("/dashboard");
           }}
         >
@@ -177,6 +181,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {NAV.map((n) => (
                   <SidebarMenuItem key={n.href}>
                     <SidebarMenuButton
+                      data-tour={`nav-${n.href.slice(1)}`}
                       isActive={pathname.startsWith(n.href)}
                       tooltip={n.label}
                       render={<Link href={n.href} />}

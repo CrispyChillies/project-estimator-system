@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 
 import { api, ApiError } from "@/lib/api";
 
@@ -51,5 +52,7 @@ export function useOnboarding() {
     mutationFn: (patch: Record<string, unknown>) => api<Me>("/auth/me/onboarding", { method: "PUT", json: { state: patch } }),
     onSuccess: (m) => qc.setQueryData(meKey, m),
   });
-  return { state, update: (patch: Record<string, unknown>) => update.mutate(patch) };
+  const { mutate } = update;
+  const apply = useCallback((patch: Record<string, unknown>) => mutate(patch), [mutate]);
+  return { state, update: apply };
 }

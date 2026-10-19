@@ -23,6 +23,14 @@ def scope(db: Session = Depends(get_db), user: User = Depends(current_user)) -> 
     return {"projects": None if pool is None else len(pool), "includes_reference_library": pool_uses_archive(db, user.id)}
 
 
+@router.get("/insights/analytics")
+def productivity_analytics(db: Session = Depends(get_db), user: User = Depends(current_user)) -> dict:
+    from app.services.analytics import analytics
+
+    return {**analytics(db, pool_project_ids(db, user.id)),
+            "includes_reference_library": pool_uses_archive(db, user.id)}
+
+
 @router.get("/insights/calibration")
 def calibration(db: Session = Depends(get_db), user: User = Depends(current_user)) -> list[dict]:
     return insights.calibration_overview(db, pool_project_ids(db, user.id))

@@ -162,6 +162,9 @@ test("settings has no model controls; admin page holds learning, usage and archi
 
 test("insights and backtest render", async () => {
   await page.goto("/insights");
+  await expect(page.getByTestId("chart-estimate-vs-actual")).toBeVisible();
+  await shot("insights");
+  await page.getByRole("tab", { name: "Calibration & rules" }).click();
   await expect(page.getByText("Calibration factor by category")).toBeVisible();
   await shot("insights");
   await page.goto("/backtest");

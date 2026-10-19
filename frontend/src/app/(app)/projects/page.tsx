@@ -86,7 +86,7 @@ export default function ProjectsPage() {
       <PageHeader
         title="Projects"
         description="Briefs, estimates and delivered history."
-        actions={<NewProjectDialog />}
+        actions={<NewProjectDialog autoOpen />}
       />
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="relative">

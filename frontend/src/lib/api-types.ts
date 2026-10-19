@@ -712,7 +712,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get Session */
+        get: operations["get_session_api_v1_agent_sessions__session_id__get"];
         put?: never;
         post?: never;
         /** Delete Session */
@@ -771,6 +772,27 @@ export interface paths {
          * @description SSE stream; 409 if a run is already active for this session. Contract: docs/AGENT_PROTOCOL.md.
          */
         post: operations["start_run_api_v1_agent_sessions__session_id__runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/sessions/{session_id}/runs/async": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Run Async
+         * @description Polling fallback for networks that buffer or block event streams: start the run, then poll
+         *     `/agent/sessions/{id}` (run_state) and `/messages` until it is idle.
+         */
+        post: operations["start_run_async_api_v1_agent_sessions__session_id__runs_async_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1028,6 +1050,23 @@ export interface paths {
         };
         /** Scope */
         get: operations["scope_api_v1_insights_scope_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insights/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Productivity Analytics */
+        get: operations["productivity_analytics_api_v1_insights_analytics_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1320,6 +1359,26 @@ export interface paths {
         };
         /** Get Job */
         get: operations["get_job_api_v1_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Progress
+         * @description Getting-started checklist, derived from what the user has actually done.
+         */
+        get: operations["my_progress_api_v1_me_progress_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2087,10 +2146,7 @@ export interface components {
         };
         /** LoginIn */
         LoginIn: {
-            /**
-             * Email
-             * Format: email
-             */
+            /** Email */
             email: string;
             /** Password */
             password: string;
@@ -2472,6 +2528,8 @@ export interface components {
             text: string;
             /** Idempotency Key */
             idempotency_key?: string | null;
+            /** Selected Task Ids */
+            selected_task_ids?: string[];
         };
         /** SessionIn */
         SessionIn: {
@@ -2653,6 +2711,12 @@ export interface components {
              * @default
              */
             note: string;
+            /**
+             * Reason
+             * @default unspecified
+             * @enum {string}
+             */
+            reason: "missed_requirement" | "clarified_scope" | "change_request" | "other" | "unspecified";
         };
         /** UnplannedOut */
         UnplannedOut: {
@@ -2669,6 +2733,11 @@ export interface components {
             category_id: string | null;
             /** Note */
             note: string;
+            /**
+             * Reason
+             * @default unspecified
+             */
+            reason: string;
         };
         /** UserPatch */
         UserPatch: {
@@ -4234,7 +4303,9 @@ export interface operations {
     };
     list_sessions_api_v1_estimates__estimate_id__agent_sessions_get: {
         parameters: {
-            query?: never;
+            query?: {
+                include_archived?: boolean;
+            };
             header?: never;
             path: {
                 estimate_id: string;
@@ -4282,6 +4353,39 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_api_v1_agent_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4451,6 +4555,41 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_run_async_api_v1_agent_sessions__session_id__runs_async_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5083,6 +5222,28 @@ export interface operations {
             };
         };
     };
+    productivity_analytics_api_v1_insights_analytics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     calibration_api_v1_insights_calibration_get: {
         parameters: {
             query?: never;
@@ -5507,6 +5668,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_progress_api_v1_me_progress_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

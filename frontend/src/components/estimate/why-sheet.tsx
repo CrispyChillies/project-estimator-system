@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { HelpTip } from "@/components/onboarding";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,10 +9,13 @@ import { useChunkLookup, useRules } from "@/hooks/queries";
 import { factor, hours, num } from "@/lib/format";
 import type { Provenance, TaskOut } from "@/lib/types";
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, help }: { title: string; children: React.ReactNode; help?: { href: string; text: string } }) {
   return (
     <section className="space-y-2">
-      <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{title}</h3>
+      <h3 className="flex items-center gap-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+        {title}
+        {help && <HelpTip label={title} href={help.href} text={help.text} />}
+      </h3>
       {children}
     </section>
   );
@@ -80,7 +84,7 @@ export function WhySheet({ task, onClose }: { task: TaskOut | null; onClose: () 
                   </p>
                 </Section>
                 <Separator />
-                <Section title="Calibration">
+                <Section title="Calibration" help={{ href: "/help/estimates#calibration", text: "A multiplier learned from how your team changed AI drafts and from delivered actuals, per category." }}>
                   {cal ? (
                     <div className="space-y-1">
                       <div>
@@ -130,7 +134,7 @@ export function WhySheet({ task, onClose }: { task: TaskOut | null; onClose: () 
                   )}
                 </Section>
                 <Separator />
-                <Section title="Similar past projects used as context">
+                <Section title="Similar past projects used as context" help={{ href: "/help/estimates#references", text: "Up to 3 of your most similar finalized projects, given to the AI as calibration evidence." }}>
                   {prov?.reference_projects?.length ? (
                     <ul className="space-y-1.5 text-xs">
                       {prov.reference_projects.map((r) => (

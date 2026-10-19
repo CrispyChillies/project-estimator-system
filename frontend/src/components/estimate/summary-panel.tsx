@@ -3,6 +3,7 @@
 import { Bar, BarChart, CartesianGrid, ReferenceLine, XAxis, YAxis } from "recharts";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { HelpTip } from "@/components/onboarding";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -45,7 +46,9 @@ export function SummaryPanel({ summary, roles }: { summary?: EstimateSummary; ro
         <CardContent className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <div className="text-xs text-muted-foreground">P50</div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                P50 <HelpTip label="P50 and P80" href="/help/estimates#p50-p80" text="P50: half of simulated outcomes are below this total. P80: 80% are below — the safer number to commit to." />
+              </div>
               <div className="text-2xl font-semibold tabular-nums">{hours(sim.p50)}</div>
             </div>
             <div>

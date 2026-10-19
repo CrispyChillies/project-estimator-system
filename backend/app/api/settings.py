@@ -88,3 +88,33 @@ def my_usage(user: User = Depends(current_user), db: Session = Depends(get_db)) 
 @router.get("/jobs/{job_id}", response_model=S.JobOut)
 def get_job(job_id: uuid.UUID, db: Session = Depends(get_db)):
     return jobs.get_job(db, job_id)
+
+
+@router.get("/me/progress")
+def my_progress(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    """Getting-started checklist, derived from what the user has actually done."""
+    from app.db.models import AgentMessage, AgentSession, Document, Estimate, Project, Task, TaskActual
+
+    mine = select(Project.id).where(Project.owner_id == user.id)
+    if user.role == "admin":  # the admin's checklist only counts projects they created themselves
+        mine = mine.where(Project.is_archive.is_(False))
+    pids = list(db.scalars(mine))
+    eids = list(db.scalars(select(Estimate.id).where(Estimate.project_id.in_(pids)))) if pids else []
+    state = user.onboarding_state or {}
+
+    def exists(q) -> bool:
+        return bool(db.scalar(select(func.count()).select_from(q.subquery())))
+
+    return {
+        "created_project": bool(pids),
+        "uploaded_brief": bool(pids) and exists(select(Document.id).where(Document.project_id.in_(pids))),
+        "generated_estimate": bool(eids),
+        "used_agent": bool(eids) and exists(select(AgentMessage.id).join(AgentSession, AgentSession.id ==
+                                                                         AgentMessage.session_id)
+                                            .where(AgentSession.estimate_id.in_(eids), AgentMessage.role == "user")),
+        "finalized": bool(pids) and exists(select(Estimate.id).where(Estimate.project_id.in_(pids),
+                                                                     Estimate.status == "final")),
+        "entered_actuals": bool(eids) and exists(select(TaskActual.id).join(Task, Task.id == TaskActual.task_id)
+                                                 .where(Task.estimate_id.in_(eids))),
+        "viewed_insights": bool(state.get("viewed_insights")),
+    }

@@ -2,11 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, RefreshCw } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 
 import { EmptyState, PageHeader } from "@/components/common";
+import { ProductivityAnalytics } from "@/components/insights/productivity-analytics";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useOnboarding } from "@/hooks/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -115,7 +118,7 @@ function RulesCard() {
   );
 }
 
-export default function InsightsPage() {
+function CalibrationView() {
   const { data: cal, isLoading } = useCalibration();
   const { data: timeline } = useTimeline();
   const { data: accuracy } = useAccuracyOverTime();
@@ -366,6 +369,30 @@ export default function InsightsPage() {
         </Card>
         <RulesCard />
       </div>
+    </div>
+  );
+}
+
+export default function InsightsPage() {
+  const { state, update } = useOnboarding();
+  useEffect(() => {
+    if (!state.viewed_insights) update({ viewed_insights: true });
+  }, [state.viewed_insights, update]);
+  return (
+    <div className="space-y-4">
+      <PageHeader title="Insights" description="How accurate your quotes are, where the hours go, and what the system has learned." />
+      <Tabs defaultValue="productivity">
+        <TabsList>
+          <TabsTrigger value="productivity">Productivity & accuracy</TabsTrigger>
+          <TabsTrigger value="calibration">Calibration & rules</TabsTrigger>
+        </TabsList>
+        <TabsContent value="productivity" className="pt-3">
+          <ProductivityAnalytics />
+        </TabsContent>
+        <TabsContent value="calibration" className="pt-3">
+          <CalibrationView />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

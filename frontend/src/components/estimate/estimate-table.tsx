@@ -24,6 +24,7 @@ import { Fragment, useRef, useState } from "react";
 import { ReasonChips } from "@/components/estimate/reason-chips";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { HelpTip } from "@/components/onboarding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -416,9 +417,17 @@ export function EstimateTable({
             <TableHead>Title</TableHead>
             <TableHead>Category</TableHead>
             <TableHead>Role</TableHead>
-            <TableHead>Min</TableHead>
+            <TableHead>
+              <span className="inline-flex items-center gap-1">
+                Min <HelpTip label="min–max range" href="/help/estimates#ranges" text="Each task has a range: min is an optimistic but realistic case, max a pessimistic one (about 10th–90th percentile)." />
+              </span>
+            </TableHead>
             <TableHead>Max</TableHead>
-            <TableHead>Conf.</TableHead>
+            <TableHead>
+              <span className="inline-flex items-center gap-1">
+                Conf. <HelpTip label="confidence" href="/help/estimates#confidence" text="How sure the AI is that it understood the task from the brief. Low confidence often means a clarifying question is worth asking." />
+              </span>
+            </TableHead>
             <TableHead>Δ vs AI</TableHead>
             <TableHead>On</TableHead>
             <TableHead />

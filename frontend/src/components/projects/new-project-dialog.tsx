@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -33,8 +33,13 @@ const schema = z.object({
 });
 type FormValues = z.infer<typeof schema>;
 
-export function NewProjectDialog() {
+export function NewProjectDialog({ autoOpen = false }: { autoOpen?: boolean }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    // "/projects?new=1" (from the dashboard) opens the dialog directly.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read the URL once after hydration
+    if (autoOpen && new URLSearchParams(window.location.search).get("new") === "1") setOpen(true);
+  }, [autoOpen]);
   const router = useRouter();
   const qc = useQueryClient();
   const form = useForm<FormValues>({

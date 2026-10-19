@@ -167,3 +167,11 @@ Short log of choices made where the brief was ambiguous or reality forced a devi
     panel, generated API types). Archived rows are not edited; a narrow display alias at the API boundary shows
     "Synthetic Client A" as "Client A" and `demo_brief_2.md` as `brief_2.md`. Statistical honesty stays: small-sample
     warnings and "includes reference library data" where member charts use the archive.
+55. **Onboarding** is built in (no third-party tour library): a welcome dialog, an 8-step tour anchored to real
+    elements (`data-tour`), keyboard operable (→ ← Esc), resumable from `users.onboarding_state`, plus a
+    "Getting started" checklist whose items are derived from what the user actually did (`/me/progress`).
+56. **Analytics** (`/insights/analytics`) are computed per request from the user's pool; each block returns `n` and
+    an `enough` flag (≥3 delivered projects, ≥10 tasks, ≥5 tasks per category) so the UI shows "Not enough data
+    yet" instead of misleading numbers. Unplanned work gained a `reason` (migration 0005, existing rows
+    "unspecified"). Chart definitions live in one file (`frontend/src/lib/chart-guides.ts`) used by both the
+    in-app drawers and `/help/analytics`.

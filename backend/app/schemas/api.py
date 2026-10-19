@@ -361,11 +361,15 @@ class ActualRow(BaseModel):
     note: str | None
 
 
+UnplannedReason = Literal["missed_requirement", "clarified_scope", "change_request", "other", "unspecified"]
+
+
 class UnplannedIn(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     hours: float = Field(gt=0, le=100_000)
     category_id: uuid.UUID | None = None
     note: str = ""
+    reason: UnplannedReason = "unspecified"
 
 
 class UnplannedOut(ORM):
@@ -374,6 +378,7 @@ class UnplannedOut(ORM):
     hours: float
     category_id: uuid.UUID | None
     note: str
+    reason: str = "unspecified"
 
 
 class RuleOut(ORM):

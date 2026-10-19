@@ -50,7 +50,7 @@ def list_unplanned(project_id: uuid.UUID, db: Session = Depends(get_db)):
 
 @router.post("/projects/{project_id}/unplanned", response_model=S.UnplannedOut, status_code=201)
 def add_unplanned(project_id: uuid.UUID, body: S.UnplannedIn, db: Session = Depends(get_db)):
-    u = ac.add_unplanned(db, project_id, body.title, body.hours, body.category_id, body.note)
+    u = ac.add_unplanned(db, project_id, body.title, body.hours, body.category_id, body.note, body.reason)
     db.commit()
     return u
 
