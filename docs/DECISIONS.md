@@ -90,3 +90,9 @@ Short log of choices made where the brief was ambiguous or reality forced a devi
     pooled (`data_source` filter, synthetic by default).
 33. **Reorder**: keyboard drag (dnd-kit KeyboardSensor) was added. E2E uses it because pointer-drag was
     unreliable in headless runs.
+34. **Agent operations**: every agent write is one `agent_operations` row (a list of primitive ops) applied
+    atomically in a SAVEPOINT via `services/estimates.py`, so `edit_events` carry `operation_id`/`batch_id`/
+    `session_id`. Undo appends inverse events (log rows are never edited); tasks the user changed after the op
+    (detected by `tasks.row_version`) are skipped, giving a partial undo that is reported to the user.
+35. **Migration 0003** is idempotent (`create_all(checkfirst)` + `ADD COLUMN IF NOT EXISTS`) because 0001 builds
+    the schema from current metadata.
