@@ -42,6 +42,9 @@ def ensure_reference_data(db: Session) -> None:
     if db.get(Setting, "learning") is None:
         db.add(Setting(key="learning", value=DEFAULTS.model_dump()))
     db.commit()
+    from app.services.rates import apply_vn_defaults
+
+    apply_vn_defaults(db)
 
 
 def category_maps(db: Session) -> tuple[dict, dict]:

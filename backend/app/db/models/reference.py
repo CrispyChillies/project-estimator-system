@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,6 +22,9 @@ class User(IdMixin, TimestampMixin, Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     onboarding_state: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
     daily_usd_cap: Mapped[float | None] = mapped_column(Float)
+    display_currency: Mapped[str] = mapped_column(String(3), default="VND", server_default="VND")
+    rate_overrides: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")  # role_id -> VND/h
+    tag_colors: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")  # "role:<id>" -> token
 
 
 class AuthSession(IdMixin, TimestampMixin, Base):
@@ -68,6 +71,7 @@ class DeliveryRole(IdMixin, TimestampMixin, Base):
     hourly_rate: Mapped[float] = mapped_column(Float, default=50.0)
     currency: Mapped[str] = mapped_column(String(3), default="EUR")
     color: Mapped[str] = mapped_column(String(20), default="#64748b")
+    hourly_rate_vnd: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")  # canonical money
 
 
 class TaskCategory(IdMixin, TimestampMixin, Base):
@@ -75,6 +79,7 @@ class TaskCategory(IdMixin, TimestampMixin, Base):
     key: Mapped[str] = mapped_column(String(60), unique=True)
     name: Mapped[str] = mapped_column(String(120))
     description: Mapped[str] = mapped_column(String(500), default="")
+    color: Mapped[str] = mapped_column(String(20), default="", server_default="")
 
 
 class Setting(TimestampMixin, Base):

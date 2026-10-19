@@ -59,6 +59,10 @@ services:
         value: https://project-calibrate.vercel.app
       - key: CORS_ORIGINS
         value: https://project-calibrate.vercel.app
+      - key: USD_VND_RATE_DEFAULT
+        value: "25869" # open.er-api.com, 2026-10-19; the admin can change it in Settings
+      - key: FX_AUTO_UPDATE
+        value: "true" # daily refresh from the public provider (non-blocking, falls back to the stored rate)
       - key: SEED_ARCHIVE
         value: "true"
       - key: LOG_LEVEL

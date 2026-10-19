@@ -9,7 +9,7 @@ PROMPT_VERSIONS = {
     "estimation": "estimation-v1",
     "lessons": "lessons-v1",
     "chat_agent": "chat-agent-v2",
-    "agent_panel": "agent-panel-v1",
+    "agent_panel": "agent-panel-v2",
 }
 
 UNIT_DEFINITION = (

@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     invite_code: str = ""
     public_app_url: str = "http://localhost:3000"
     robots_index: bool = False
+    # --- currency: canonical VND, USD is a conversion at this workspace rate ---
+    usd_vnd_rate_default: float = 25869.0  # open.er-api.com, 2026-10-19 (see docs/RATES_VN.md)
+    fx_auto_update: bool = False
+    fx_source_url: str = "https://open.er-api.com/v6/latest/USD"
     # --- cost protection ---
     user_daily_usd_cap: float = 0.50
     user_hourly_requests: int = 60

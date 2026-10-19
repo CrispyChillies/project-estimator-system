@@ -34,6 +34,22 @@ def _say(res: dict) -> str:
     return res.get("summary", "")
 
 
+_MONEY_CUE = re.compile(r"\d\s*(?:tr|triệu|trieu|tỷ|tỉ|ty|k|nghìn|ngàn)\b|\$|usd|vnd|vnđ|₫|đồng|\dđ")
+_BUDGET_WORD = re.compile(r"ngân sách|ngan sach|budget|fit|giảm|reduce|xuống|trong vòng|within|under|tối đa|cap\b|"
+                          r"bớt|cắt")
+
+
+def _money_budget(kit: Toolkit, clause: str):
+    """A money budget in the clause ("ngân sách 200 triệu", "fit to $8,000") or None. Needs a currency/unit cue."""
+    from app.db.models import User
+    from app.services.money import parse_money
+
+    if not _BUDGET_WORD.search(clause) or not _MONEY_CUE.search(clause):
+        return None
+    user = kit.db.get(User, kit.ctx.user_id) if kit.ctx.user_id else None
+    return parse_money(clause, default_currency=(user.display_currency if user else "VND") or "VND")
+
+
 def plan(kit: Toolkit, text: str) -> Plan:
     t = text.strip()
     low = t.lower()
@@ -48,7 +64,14 @@ def plan(kit: Toolkit, text: str) -> Plan:
     if low.startswith("/"):
         cmd, _, rest = low[1:].partition(" ")
         rest_raw = t[len(cmd) + 1:].strip()
-        if cmd == "fit" and re.match(NUM, rest):
+        mny = _money_budget(kit, rest) if cmd in ("fit", "budget") else None
+        if mny is None and cmd in ("fit", "budget") and rest and _MONEY_CUE.search(rest):
+            from app.services.money import parse_money
+
+            mny = parse_money(rest, default_currency="VND")
+        if cmd in ("fit", "budget") and mny is not None:
+            call("fit_to_cost_budget", target_amount=mny.amount, currency=mny.currency)
+        elif cmd == "fit" and re.match(NUM, rest):
             call("fit_to_budget", target_hours=float(re.match(NUM, rest).group(1)))
         elif cmd == "adjust":
             m = re.match(r"([+-]?\d+(?:\.\d+)?)\s*%?\s*(.*)$", rest)
@@ -85,6 +108,8 @@ def plan(kit: Toolkit, text: str) -> Plan:
             call("delete_tasks", tasks=sel)
         elif refers_sel and re.search(r"\bround\b", clause):
             call("bulk_adjust", tasks=sel, percent=0, round_to=0.5)
+        elif (mny := _money_budget(kit, clause)) is not None:
+            call("fit_to_cost_budget", target_amount=mny.amount, currency=mny.currency)
         elif m := re.search(r"\bfit\b(?: the)?(?: (.+?))? to " + NUM + r"\s*(?:h\b|hours?)?", clause):
             scope = (m.group(1) or "").strip()
             group = None if not scope or re.search(r"whole|estimate|everything|all|total", scope) else scope

@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import current_user_id
+from app.core.auth import current_user
 from app.core.errors import AppError
 from app.core.usage import AIRateLimit
 from app.db.models import Assumption, Estimate
@@ -14,7 +15,7 @@ from app.services import added_tasks, exports, jobs, sensitivity
 from app.services import estimates as es
 from app.services.generation import generate
 from app.services.learning import finalize_estimate
-from app.services.summary import compute_summary, ensure_summary
+from app.services.summary import compute_summary, ensure_summary, with_user_costs
 from app.services.views import activity, compare, estimate_tree
 
 router = APIRouter(tags=["estimates"])
@@ -54,10 +55,10 @@ def get_estimate(estimate_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/estimates/{estimate_id}/summary")
-def get_summary(estimate_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+def get_summary(estimate_id: uuid.UUID, db: Session = Depends(get_db), user=Depends(current_user)) -> dict:
     s = ensure_summary(db, es.get_estimate(db, estimate_id))
     db.commit()
-    return s
+    return with_user_costs(db, s, user)
 
 
 @router.get("/estimates/{estimate_id}/references")
@@ -246,12 +247,13 @@ def list_assumptions(estimate_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/estimates/{estimate_id}/export")
-def export(estimate_id: uuid.UUID, format: str = "xlsx", db: Session = Depends(get_db)):
+def export(estimate_id: uuid.UUID, format: str = "xlsx", currency: str | None = None, db: Session = Depends(get_db),
+           user=Depends(current_user)):
     est = es.get_estimate(db, estimate_id)
     name = f"estimate-v{est.version}"
     if format == "csv":
-        return Response(exports.to_csv(db, estimate_id), media_type="text/csv",
+        return Response(exports.to_csv(db, estimate_id, user, currency), media_type="text/csv",
                         headers={"Content-Disposition": f'attachment; filename="{name}.csv"'})
-    return Response(exports.to_xlsx(db, estimate_id),
+    return Response(exports.to_xlsx(db, estimate_id, user, currency),
                     media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f'attachment; filename="{name}.xlsx"'})

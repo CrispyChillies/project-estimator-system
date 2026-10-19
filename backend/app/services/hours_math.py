@@ -108,3 +108,71 @@ def rebalance_share(ranges: list[tuple[float, float]], in_group: list[bool], sha
         nhi = max(STEP, round_step(hi * f))
         out.append((min(nhi, max(0.0, round_step(lo * f))), nhi))
     return out
+
+
+@dataclass
+class CostFitResult:
+    feasible: bool
+    new_ranges: list[tuple[float, float]]
+    feasible_min_cost: float
+    achieved_cost: float  # cost of the new max hours (<= target when feasible)
+    message: str = ""
+
+
+def fit_to_cost_budget(ranges: list[tuple[float, float]], rates: list[float], target_cost: float, *,
+                       locked: list[bool] | None = None) -> CostFitResult:
+    """Scale unlocked tasks so the cost of the max hours (sum max_h * rate) is as close as possible to `target_cost`
+    without exceeding it. Same rules as `fit_to_budget`: half-hour steps, each task keeps at least MIN_FRACTION of its
+    max, min <= max, tasks at rate 0 only count as fixed. Infeasible -> unchanged ranges + the minimum possible cost.
+    Pure arithmetic; the LLM never computes money."""
+    n = len(ranges)
+    locked = locked or [False] * n
+    locked_cost = sum(r[1] * rt for r, rt, lk in zip(ranges, rates, locked, strict=True) if lk)
+    free = [i for i in range(n) if not locked[i] and ranges[i][1] > 0]
+    fixed_cost = locked_cost + sum(ranges[i][1] * rates[i] for i in range(n) if not locked[i] and ranges[i][1] <= 0)
+    floors = {i: task_floor(ranges[i][1]) for i in free}
+    min_cost = fixed_cost + sum(floors[i] * rates[i] for i in free)
+    zero_rate = [i for i in free if rates[i] <= 0]
+    if not free or target_cost < min_cost - 1e-6:
+        return CostFitResult(False, list(ranges), min_cost, sum(r[1] * rt for r, rt in zip(ranges, rates, strict=True)),
+                             f"Cannot fit {target_cost:,.0f} ₫: the smallest sensible total is {min_cost:,.0f} ₫ "
+                             f"(no task cut by more than {100 * (1 - MIN_FRACTION):.0f}%).")
+    # one common factor f over free tasks: cost(f) = fixed + sum(rate * max(floor, hi * f)); monotone -> bisection
+    def cost_at(f: float) -> float:
+        return fixed_cost + sum(rates[i] * max(floors[i], ranges[i][1] * f) for i in free)
+
+    lo_f, hi_f = 0.0, 1.0
+    while cost_at(hi_f) < target_cost and hi_f < 1e6:
+        hi_f *= 2
+    for _ in range(80):
+        mid_f = (lo_f + hi_f) / 2
+        if cost_at(mid_f) < target_cost:
+            lo_f = mid_f
+        else:
+            hi_f = mid_f
+    f = lo_f
+    units = {i: max(math.ceil(floors[i] / STEP - 1e-9), math.floor(ranges[i][1] * f / STEP + 1e-9)) for i in free}
+    cost = fixed_cost + sum(units[i] * STEP * rates[i] for i in free)
+    # spend the remaining budget in half-hour steps, largest fractional remainder first, never exceeding the target
+    order = sorted((i for i in free if rates[i] > 0),
+                   key=lambda i: -((ranges[i][1] * f / STEP) - math.floor(ranges[i][1] * f / STEP + 1e-9)))
+    progressed = True
+    while progressed:
+        progressed = False
+        for i in order:
+            if cost + STEP * rates[i] <= target_cost + 1e-6:
+                units[i] += 1
+                cost += STEP * rates[i]
+                progressed = True
+    out = list(ranges)
+    for i in free:
+        lo, hi = ranges[i]
+        mx = units[i] * STEP
+        ratio = mx / hi if hi > 0 else 1.0
+        out[i] = (min(mx, max(0.0, round_step(lo * ratio))), mx)
+    for i in zero_rate:  # unpriced tasks keep their scale factor so the plan stays proportional
+        lo, hi = ranges[i]
+        mx = max(floors[i], round_step(hi * f))
+        out[i] = (min(mx, max(0.0, round_step(lo * f))), mx)
+    achieved = sum(out[i][1] * rates[i] for i in range(n))
+    return CostFitResult(True, out, min_cost, achieved)

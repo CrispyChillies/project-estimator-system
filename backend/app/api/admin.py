@@ -180,3 +180,30 @@ def model_status(db: Session = Depends(get_db)) -> dict[str, Any]:
     from app.services.learning import model_status as status
 
     return status(db)
+
+
+class FxIn(BaseModel):
+    rate: float = Field(gt=0)
+
+
+@router.put("/fx")
+def set_workspace_fx(body: FxIn, db: Session = Depends(get_db)) -> dict:
+    """Admin: set the USD/VND workspace rate by hand (manual rates are never overwritten by auto-update)."""
+    from app.services import fx
+
+    try:
+        return fx.set_fx(db, body.rate, "manual")
+    except ValueError as e:
+        raise AppError("bad_value", str(e), 422) from e
+
+
+@router.post("/fx/refresh")
+def refresh_workspace_fx(db: Session = Depends(get_db)) -> dict:
+    """Admin: fetch the current rate from the public provider now (explicit action; short timeout)."""
+    from app.core.config import get_settings
+    from app.services import fx
+
+    try:
+        return fx.set_fx(db, fx.fetch_rate(get_settings().fx_source_url), "auto: open.er-api.com")
+    except Exception as e:
+        raise AppError("fx_unavailable", "Could not fetch the exchange rate; the stored rate is unchanged", 502) from e

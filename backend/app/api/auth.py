@@ -57,7 +57,8 @@ class QuickIn(BaseModel):
 
 def me_out(u: User) -> dict:
     return {"id": str(u.id), "name": u.name, "email": u.email, "role": u.role,
-            "onboarding_state": u.onboarding_state or {}, "last_login_at": u.last_login_at}
+            "onboarding_state": u.onboarding_state or {}, "last_login_at": u.last_login_at,
+            "display_currency": u.display_currency or "VND", "tag_colors": u.tag_colors or {}}
 
 
 def _login(db: Session, request: Request, response: Response, user: User) -> dict:

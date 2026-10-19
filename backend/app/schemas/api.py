@@ -23,15 +23,19 @@ class UserOut(ORM):
 class RoleOut(ORM):
     id: uuid.UUID
     name: str
-    hourly_rate: float
-    currency: str
-    color: str
+    color: str  # effective palette token for this user (own choice, else default)
+    default_color: str
+    hourly_rate_vnd: int  # workspace default (canonical VND)
+    my_rate_vnd: int | None = None  # this user's own override
+    rate_vnd: int  # effective for this user
 
 
 class RoleUpdate(BaseModel):
-    hourly_rate: float = Field(ge=0, le=10_000)
-    currency: str = Field(min_length=3, max_length=3)
-    color: str | None = None
+    """Money is entered in either currency and converted to canonical VND once, on the server."""
+
+    amount: float | None = Field(None, ge=0, le=10_000_000_000)
+    currency: Literal["VND", "USD"] = "VND"
+    color: str | None = Field(None, max_length=20)
 
 
 class CategoryOut(ORM):
@@ -39,11 +43,14 @@ class CategoryOut(ORM):
     key: str
     name: str
     description: str
+    color: str
+    default_color: str
 
 
 class CategoryUpdate(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
-    description: str = Field("", max_length=500)
+    name: str | None = Field(None, min_length=1, max_length=120)
+    description: str | None = Field(None, max_length=500)
+    color: str | None = Field(None, max_length=20)
 
 
 ProjectStatus = Literal["draft", "quoted", "won", "lost", "delivered"]

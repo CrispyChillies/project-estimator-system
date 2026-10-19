@@ -96,6 +96,14 @@ def system_prompt(db: Session, s: AgentSession) -> str:
     use = s.use_memory
     mem_txt = "\n".join(f"- [{m.kind}, origin={m.origin}] {m.text}" for m in mems) if use and mems else "none"
     state = "\n".join(f"- {k}: {v}" for k, v in (s.state or {}).items()) or "none"
-    return render("agent_panel", state=state, summary=(s.summary if use else "") or "none", memories=mem_txt,
+    from app.db.models import User
+    from app.services import fx
+
+    u = db.get(User, s.created_by) if s.created_by else None
+    cur = (u.display_currency if u else "VND") or "VND"
+    currency = (f"the user's display currency is {cur}; 1 USD = {fx.get_rate(db):,.0f} VND (canonical money is VND). "
+                f"State amounts in {cur} ({'₫ with dot thousands, e.g. 350 triệu' if cur == 'VND' else '$ with commas'}); "
+                f"give the other currency in parentheses only when asked.")
+    return render("agent_panel", currency=currency, state=state, summary=(s.summary if use else "") or "none", memories=mem_txt,
                   rules="\n".join(f"- {r.text}" for r in active_rules(db, s.created_by)) or "none",
                   estimate=estimate_overview(db, s.estimate_id))

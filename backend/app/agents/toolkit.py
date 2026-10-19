@@ -127,6 +127,13 @@ class FitBudgetArgs(BaseModel):
     lock_tasks: list[str] = Field(default_factory=list, description="Tasks that must not change.")
 
 
+class FitCostBudgetArgs(BaseModel):
+    target_amount: float = Field(gt=0, description="Budget as a number in `currency` units (e.g. 200000000 for 200 triệu).")
+    currency: Literal["VND", "USD"] = "VND"
+    group: str | None = Field(None, description="Fit only this group; the rest stays as is.")
+    lock_tasks: list[str] = Field(default_factory=list, description="Tasks that must not change.")
+
+
 class RebalanceArgs(BaseModel):
     role: str
     share_pct: float = Field(gt=0, lt=100, description="Target share of the total midpoint hours.")
@@ -195,6 +202,8 @@ TOOL_SPECS: dict[str, tuple[type[BaseModel], str, bool]] = {
     "set_hours": (SetHoursArgs, "Set min/max hours for one or more tasks.", True),
     "bulk_adjust": (BulkAdjustArgs, "Scale hours of selected tasks by a percentage and/or round them.", True),
     "fit_to_budget": (FitBudgetArgs, "Deterministically scale tasks so total max hours equals a target.", True),
+    "fit_to_cost_budget": (FitCostBudgetArgs, "Deterministically scale task hours so the total cost (max hours x role "
+                           "rates) fits a money budget in VND or USD.", True),
     "rebalance_roles": (RebalanceArgs, "Make one role a given % of the total, keeping the total.", True),
     "split_task": (SplitArgs, "Split a task into parts; total hours preserved.", True),
     "merge_tasks": (MergeArgs, "Merge tasks into one; hours summed.", True),
@@ -623,6 +632,37 @@ class Toolkit:
         return self.submit("fit_to_budget", a, ops,
                            f"Fit {'group ' + a.group if a.group else 'estimate'} to {target:g} h max "
                            f"({len(ops)} task(s) changed)", cid)
+
+    def fit_to_cost_budget(self, a: FitCostBudgetArgs, cid: str) -> dict:
+        from app.db.models import User
+        from app.services import fx, money
+        from app.services.rates import effective_rates
+
+        user = self.db.get(User, self.ctx.user_id) if self.ctx.user_id else None
+        cur = (user.display_currency if user else "VND") or "VND"
+        rate = fx.get_rate(self.db)
+        target = money.to_vnd(a.target_amount, a.currency, rate, step=1)
+        rates = effective_rates(self.db, user)
+        scope = [t for t in self._tasks(self.group(a.group).id if a.group else None) if t.enabled]
+        locked_ids = {self.task(r).id for r in a.lock_tasks}
+        res = hm.fit_to_cost_budget([(t.min_hours, t.max_hours) for t in scope],
+                                    [float(rates.get(t.delivery_role_id, 0)) for t in scope], float(target),
+                                    locked=[t.id in locked_ids for t in scope])
+        if not res.feasible:
+            self.ctx.paused = "awaiting_user"
+            floor_txt = money.format_money(res.feasible_min_cost, cur, rate)
+            msg = (f"Cannot fit {money.format_money(target, cur, rate)}: the smallest sensible total is {floor_txt} "
+                   f"(no task cut by more than 75%).")
+            opts = [f"Fit to {floor_txt} (minimum possible)", "Remove or hide some scope first",
+                    "Keep the current estimate"]
+            self.ctx.emit("ask_user", {"question": msg + " How would you like to proceed?", "options": opts})
+            return {"status": "infeasible", "summary": msg, "data": {"feasible_min_vnd": round(res.feasible_min_cost)}}
+        ops = self._hours_ops([(t, lo, hi) for t, (lo, hi) in zip(scope, res.new_ranges, strict=True)],
+                              f"fit to {money.format_money(target, cur, rate)}")
+        return self.submit("fit_to_cost_budget", a, ops,
+                           f"Fit {'group ' + a.group if a.group else 'estimate'} to a "
+                           f"{money.format_money(target, cur, rate)} budget "
+                           f"(cost {money.format_money(res.achieved_cost, cur, rate)}, {len(ops)} task(s) changed)", cid)
 
     def rebalance_roles(self, a: RebalanceArgs, cid: str) -> dict:
         rid = self.role_id(a.role)
