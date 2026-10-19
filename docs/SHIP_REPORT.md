@@ -9,7 +9,7 @@ Date: 2026-10-20. Every number below was measured in this run; nothing is estima
 | Frontend | **Live:** https://project-calibrate.vercel.app (landing, help, sign-in/up pages). |
 | API + database | **Ready to deploy, not deployed.** Render Blueprint (`render.yaml`) + production image; needs the owner's Render account and secrets ([DEPLOYMENT.md](DEPLOYMENT.md)). Until then `/api/*` on the Vercel URL returns 404. |
 | End-to-end rehearsal | Production API image → empty Postgres → archive seed → production Next build → `make deploy-check` with sign-in, live estimate and streamed agent run: **21/21 passed**. |
-| `make deploy-check URL=https://project-calibrate.vercel.app` today | 7 passed (pages, robots, CSP/nosniff, HSTS, docs hidden), 8 failed — all API checks, because the API is not deployed yet. |
+| `make deploy-check URL=https://project-calibrate.vercel.app` today | 6 passed (landing, help, robots, CSP/nosniff, HSTS, docs hidden), 8 failed — all API checks, because the API is not deployed yet. |
 
 ## Requirements
 
