@@ -84,6 +84,7 @@ class Task(IdMixin, TimestampMixin, Base):
     source_chunk_ids: Mapped[list[uuid.UUID]] = mapped_column(ARRAY(UUID(as_uuid=True)), default=list)
     origin: Mapped[str] = mapped_column(String(10), default="ai")
     ai_key: Mapped[str | None] = mapped_column(String(80), index=True)
+    row_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     embedding: Mapped[list[float] | None] = mapped_column(Vector(DIM))
 
 
@@ -109,6 +110,7 @@ class TaskAIBaseline(IdMixin, TimestampMixin, Base):
     prompt_version: Mapped[str] = mapped_column(String(40))
     model: Mapped[str] = mapped_column(String(80))
     model_key: Mapped[str] = mapped_column(String(160), default="fake-v1")
+    retrieval: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)  # k, project ids, pack hash
 
 
 class Assumption(IdMixin, TimestampMixin, Base):
@@ -159,6 +161,9 @@ class EditEvent(IdMixin, Base):
     reason_tag: Mapped[str | None] = mapped_column(String(40))
     reason_text: Mapped[str | None] = mapped_column(Text)
     proposal_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    operation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
+    session_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("clock_timestamp()")
     )
@@ -178,15 +183,96 @@ class ChangeProposal(IdMixin, TimestampMixin, Base):
 
 class AgentSession(IdMixin, TimestampMixin, Base):
     __tablename__ = "agent_sessions"
-    __table_args__ = (enum_check("agent_sessions", "mode", E.AGENT_MODE),)
+    __table_args__ = (
+        enum_check("agent_sessions", "mode", E.AGENT_MODE),
+        enum_check("agent_sessions", "status", ("active", "archived", "deleted")),
+        enum_check("agent_sessions", "apply_mode", ("auto", "review")),
+    )
     estimate_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), FK("estimates.id"), index=True)
     mode: Mapped[str] = mapped_column(String(10), default="chat")
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    title: Mapped[str] = mapped_column(String(200), default="New session")
+    summary: Mapped[str] = mapped_column(Text, default="")
+    summary_upto_message_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    state: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    status: Mapped[str] = mapped_column(String(10), default="active")
+    pinned: Mapped[bool] = mapped_column(Boolean, default=False)
+    apply_mode: Mapped[str] = mapped_column(String(10), default="auto")
+    use_memory: Mapped[bool] = mapped_column(Boolean, default=True)
+    model_key: Mapped[str | None] = mapped_column(String(160))
+    run_state: Mapped[str] = mapped_column(String(20), default="idle")
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    tokens: Mapped[int] = mapped_column(Integer, default=0)
+    last_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AgentMessage(IdMixin, TimestampMixin, Base):
     __tablename__ = "agent_messages"
     session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), FK("agent_sessions.id"), index=True)
-    role: Mapped[str] = mapped_column(String(20))
+    role: Mapped[str] = mapped_column(String(20))  # user | assistant | tool | system_event
     content: Mapped[str] = mapped_column(Text, default="")
     tool_calls: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    estimate_version: Mapped[int | None] = mapped_column(Integer)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    idempotency_key: Mapped[str | None] = mapped_column(String(80), index=True)
+
+
+class AgentOperation(IdMixin, TimestampMixin, Base):
+    __tablename__ = "agent_operations"
+    __table_args__ = (enum_check("agent_operations", "status",
+                                 ("pending", "awaiting_confirmation", "applied", "rejected", "failed", "reverted")),)
+    session_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), FK("agent_sessions.id"), index=True)
+    estimate_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), FK("estimates.id"), index=True)
+    message_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    tool_call_id: Mapped[str | None] = mapped_column(String(80))
+    batch_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    op_type: Mapped[str] = mapped_column(String(40))
+    args: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    status: Mapped[str] = mapped_column(String(25), default="pending")
+    summary: Mapped[str] = mapped_column(Text, default="")
+    result: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    inverse_ops: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reverted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ProjectMemory(IdMixin, TimestampMixin, Base):
+    __tablename__ = "project_memories"
+    __table_args__ = (
+        enum_check("project_memories", "kind", ("fact", "decision", "constraint", "preference")),
+        enum_check("project_memories", "origin", ("user", "agent", "document")),
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), FK("projects.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(12))
+    text: Mapped[str] = mapped_column(Text)
+    origin: Mapped[str] = mapped_column(String(10), default="user")
+    source_session_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    source_message_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class ProjectEmbedding(IdMixin, TimestampMixin, Base):
+    __tablename__ = "project_embeddings"
+    __table_args__ = (UniqueConstraint("project_id", "model_key", name="uq_project_embeddings_project_model"),)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), FK("projects.id"), index=True)
+    model_key: Mapped[str] = mapped_column(String(160))
+    card_text: Mapped[str] = mapped_column(Text)
+    card: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    text_hash: Mapped[str] = mapped_column(String(64))
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(DIM))
+    embedding_model: Mapped[str] = mapped_column(String(80))
+
+
+class RetrievalLog(IdMixin, TimestampMixin, Base):
+    __tablename__ = "retrieval_logs"
+    estimate_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    project_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
+    session_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    query_hash: Mapped[str] = mapped_column(String(64))
+    k: Mapped[int] = mapped_column(Integer)
+    eligible_count: Mapped[int] = mapped_column(Integer)
+    model_key: Mapped[str] = mapped_column(String(160))
+    results: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)

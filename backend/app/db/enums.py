@@ -11,7 +11,7 @@ ACTOR = ("user", "agent", "system")
 EVENT_TYPES = (
     "task_added", "task_removed", "task_restored", "hours_changed", "role_changed",
     "category_changed", "title_changed", "task_toggled", "module_added", "module_removed",
-    "task_moved", "estimate_finalized", "proposal_op_rejected",
+    "task_moved", "estimate_finalized", "proposal_op_rejected", "module_restored",
 )
 REASON_TAGS = (
     "underestimated_complexity", "overestimated", "reuse_existing_code", "client_specific",

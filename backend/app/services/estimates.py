@@ -19,6 +19,9 @@ class Actor:
     kind: str = "user"  # user | agent | system
     user_id: uuid.UUID | None = None
     proposal_id: uuid.UUID | None = None
+    operation_id: uuid.UUID | None = None
+    batch_id: uuid.UUID | None = None
+    session_id: uuid.UUID | None = None
 
 
 SYSTEM = Actor("system")
@@ -36,9 +39,20 @@ def log_event(db: Session, estimate_id: uuid.UUID, actor: Actor, event_type: str
               reason_text: str | None = None) -> EditEvent:
     ev = EditEvent(estimate_id=estimate_id, task_id=task_id, module_id=module_id, user_id=actor.user_id,
                    actor=actor.kind, event_type=event_type, field=field, old_value=old, new_value=new,
-                   reason_tag=reason_tag, reason_text=reason_text, proposal_id=actor.proposal_id)
+                   reason_tag=reason_tag, reason_text=reason_text, proposal_id=actor.proposal_id,
+                   operation_id=actor.operation_id, batch_id=actor.batch_id, session_id=actor.session_id)
     db.add(ev)
+    if task_id is not None and event_type != "task_added":
+        t = db.get(Task, task_id)
+        if t is not None:
+            t.row_version = (t.row_version or 1) + 1
     return ev
+
+
+def check_version(t: Task, expected: int | None) -> None:
+    """Optimistic concurrency: reject writes based on a stale read."""
+    if expected is not None and expected != t.row_version:
+        raise Conflict(f"Task '{t.title}' changed since it was read (version {t.row_version}, expected {expected})")
 
 
 def get_estimate(db: Session, estimate_id: uuid.UUID) -> Estimate:
@@ -92,6 +106,17 @@ def remove_module(db: Session, module_id: uuid.UUID, actor: Actor) -> Module:
     return m
 
 
+def restore_module(db: Session, module_id: uuid.UUID, actor: Actor) -> Module:
+    m = db.get(Module, module_id)
+    if m is None:
+        raise NotFound("Module")
+    ensure_draft(db, m.estimate_id)
+    if m.removed:
+        m.removed = False
+        log_event(db, m.estimate_id, actor, "module_restored", module_id=m.id, new={"name": m.name})
+    return m
+
+
 def rename_module(db: Session, module_id: uuid.UUID, name: str, actor: Actor) -> Module:
     m = db.get(Module, module_id)
     if m is None:
@@ -128,9 +153,10 @@ def create_task(db: Session, estimate_id: uuid.UUID, data: dict, actor: Actor, *
 
 
 def update_task(db: Session, task_id: uuid.UUID, changes: dict, actor: Actor, *, reason_tag: str | None = None,
-                reason_text: str | None = None) -> Task:
+                reason_text: str | None = None, expected_version: int | None = None) -> Task:
     t = get_task(db, task_id)
     ensure_draft(db, t.estimate_id)
+    check_version(t, expected_version)
     changes = {k: v for k, v in changes.items() if k in TASK_FIELDS and v is not None}
     new_min = float(changes.get("min_hours", t.min_hours))
     new_max = float(changes.get("max_hours", t.max_hours))
