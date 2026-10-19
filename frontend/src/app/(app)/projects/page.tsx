@@ -85,7 +85,7 @@ export default function ProjectsPage() {
     <div>
       <PageHeader
         title="Projects"
-        description="Briefs, estimates and delivered history. Demo/synthetic data is always labelled."
+        description="Briefs, estimates and delivered history."
         actions={<NewProjectDialog />}
       />
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -127,7 +127,7 @@ export default function ProjectsPage() {
       ) : rows.length === 0 ? (
         <EmptyState
           title="No projects yet"
-          description="Create a project and upload a brief, or run `make seed` to load demo history."
+          description="Create a project, upload or paste the client brief, and generate a first estimate."
           action={<NewProjectDialog />}
         />
       ) : (

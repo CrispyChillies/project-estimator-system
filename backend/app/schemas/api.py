@@ -4,7 +4,9 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.services.display import alias
 
 
 class ORM(BaseModel):
@@ -82,6 +84,11 @@ class ProjectOut(ORM):
     is_archive: bool = False
     access: str | None = None
 
+    @field_validator("client_name", "description")
+    @classmethod
+    def _alias(cls, v: str) -> str:
+        return alias(v) or ""
+
 
 class ProjectListItem(ProjectOut):
     p50_hours: float | None = None
@@ -101,6 +108,11 @@ class DocumentOut(ORM):
     chars: int = 0
     chunk_count: int = 0
 
+    @field_validator("filename")
+    @classmethod
+    def _alias(cls, v: str) -> str:
+        return alias(v) or v
+
 
 class PasteIn(BaseModel):
     title: str = Field("pasted-brief", max_length=200)
@@ -111,6 +123,11 @@ class ChunkOut(ORM):
     id: uuid.UUID
     idx: int
     text: str
+
+    @field_validator("text")
+    @classmethod
+    def _alias(cls, v: str) -> str:
+        return alias(v) or v
 
 
 class GenerateIn(BaseModel):

@@ -162,7 +162,7 @@ export default function BacktestPage() {
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : !runs?.length ? (
-        <EmptyState title="No backtest runs" description="Seed demo data, then click “Re-run backtest” (or `make backtest`)." />
+        <EmptyState title="No backtest runs yet" description="A backtest re-estimates your delivered projects with history from the others and compares against actual hours. Deliver at least a few projects with actuals, then click “Re-run backtest”." />
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2">
@@ -192,7 +192,6 @@ export default function BacktestPage() {
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
               Small sample: {summary.n_projects} held-out projects. Brackets show 95% bootstrap CIs over projects — overlapping
               intervals mean differences may not be significant.
-              {summary.data_sources.includes("synthetic") && " Synthetic data demonstrates the mechanism only; it is not real-world evidence."}
             </div>
           )}
           {summary && (

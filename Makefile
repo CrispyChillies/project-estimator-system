@@ -1,7 +1,7 @@
 COMPOSE = docker compose
 BACKEND = $(COMPOSE) exec backend
 
-.PHONY: up down logs seed fetch-datasets warm-cache backtest test lint reset types e2e
+.PHONY: up down logs seed fetch-datasets warm-cache backtest test lint reset types e2e check-copy
 
 up: ## build and start everything (migrations run on backend start)
 	@test -f .env || cp .env.example .env
@@ -26,7 +26,7 @@ warm-cache: ## live LLM once -> data/fixtures/llm_cache (needs OPENAI_API_KEY)
 backtest:
 	$(BACKEND) python scripts/run_backtest.py
 
-test:
+test: check-copy
 	$(COMPOSE) exec -e LLM_MODE=fake -e TEST_DATABASE_URL=postgresql+psycopg://calibr:$${POSTGRES_PASSWORD:-calibr}@db:5432/calibr_test backend python -m pytest -q -p no:cacheprovider
 
 lint:
@@ -41,3 +41,6 @@ e2e: ## browser tests on an isolated stack (separate DB calibr_e2e, fake LLM, ra
 
 reset: ## disabled: data must be preserved (see docs/DATA_INVENTORY.md)
 	@echo "'make reset' is disabled. Data is preserved; restore from backups/ with pg_restore if needed." && exit 1
+
+check-copy: ## fail on demo/sample wording in user-facing text
+	node scripts/check_no_demo_strings.mjs

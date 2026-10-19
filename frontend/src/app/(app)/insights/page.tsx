@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
@@ -119,6 +119,10 @@ export default function InsightsPage() {
   const { data: cal, isLoading } = useCalibration();
   const { data: timeline } = useTimeline();
   const { data: accuracy } = useAccuracyOverTime();
+  const { data: scope } = useQuery({
+    queryKey: ["insights-scope"],
+    queryFn: () => api<{ projects: number | null; includes_reference_library: boolean }>("/insights/scope"),
+  });
   const { data: structural } = useStructural();
   const { data: categories } = useCategories();
   const catName = (k: string) => categories?.find((c) => c.key === k)?.name ?? k;
@@ -163,14 +167,14 @@ export default function InsightsPage() {
   const accData = (accuracy ?? []).filter((a) => a.ape !== null).map((a, i) => ({ idx: i + 1, name: a.name, ape: Number(((a.ape ?? 0) * 100).toFixed(1)) }));
   const covered = (accuracy ?? []).filter((a) => a.within_p80 !== null);
   const coverage = covered.length ? covered.filter((a) => a.within_p80).length / covered.length : null;
-  const anyDemo = (accuracy ?? []).some((a) => a.data_source !== "user");
+  const usesLibrary = !!scope?.includes_reference_library;
 
   if (isLoading) return <Skeleton className="h-96" />;
   if (!cal?.length)
     return (
       <div>
         <PageHeader title="Insights" />
-        <EmptyState title="Nothing learned yet" description="Finalize an estimate or run `make seed` to load history." />
+        <EmptyState title="Nothing learned yet" description="Calibration starts when you finalize an estimate: every change you made to the AI draft teaches the system. Delivered projects with actual hours teach it more." />
       </div>
     );
 
@@ -180,10 +184,8 @@ export default function InsightsPage() {
         title="What the system has learned"
         description="Calibration factors are exp(μ̃) of log(reference / raw LLM), with hierarchical shrinkage."
       />
-      {anyDemo && (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-          Includes demo/synthetic history. Synthetic results demonstrate the mechanism, not real-world accuracy.
-        </div>
+      {usesLibrary && (
+        <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground">Includes reference library data.</div>
       )}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">

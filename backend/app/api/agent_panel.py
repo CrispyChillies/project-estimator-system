@@ -17,6 +17,7 @@ from app.core.usage import AIRateLimit
 from app.db.models import AgentMessage, AgentOperation, AgentSession, ProjectMemory
 from app.db.session import get_db
 from app.services import estimates as es
+from app.services.display import alias
 from app.services.operations import OperationExecutor
 from app.services.summary import compute_summary
 
@@ -54,7 +55,7 @@ class MemoryPatch(BaseModel):
 
 
 def _session_out(s: AgentSession) -> dict:
-    return {"id": str(s.id), "estimate_id": str(s.estimate_id), "title": s.title, "summary": s.summary,
+    return {"id": str(s.id), "estimate_id": str(s.estimate_id), "title": alias(s.title), "summary": s.summary,
             "state": s.state or {}, "status": s.status, "pinned": s.pinned, "apply_mode": s.apply_mode,
             "use_memory": s.use_memory, "run_state": s.run_state, "cost_usd": s.cost_usd, "tokens": s.tokens,
             "model_key": s.model_key, "created_at": s.created_at, "last_activity_at": s.last_activity_at}

@@ -161,3 +161,9 @@ Short log of choices made where the brief was ambiguous or reality forced a devi
     cannot connect or shows no event within 20 s (`NEXT_PUBLIC_CHAT_TRANSPORT=poll` forces it).
 53. **Selection context**: checked table rows are sent as `selected_task_ids` (validated to the estimate); the planner
     maps "these/selected" to them and the live model receives them as a note on the user message.
+54. **No demo traces**: data-source badges, the model-restart banner, the offline-agent label, the user switcher,
+    seed/reset controls and all "demo/synthetic" copy are gone from the UI; `scripts/check_no_demo_strings.mjs`
+    (in `make test` and CI) scans source literals/JSX text and pre-rendered pages with an allow-list (admin archive
+    panel, generated API types). Archived rows are not edited; a narrow display alias at the API boundary shows
+    "Synthetic Client A" as "Client A" and `demo_brief_2.md` as `brief_2.md`. Statistical honesty stays: small-sample
+    warnings and "includes reference library data" where member charts use the archive.
