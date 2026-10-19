@@ -8,7 +8,7 @@ up: ## build and start everything (migrations run on backend start)
 	$(COMPOSE) up -d --build
 	@echo "Frontend: http://localhost:3000  API: http://localhost:8000/docs"
 
-down:
+down: ## stops containers; volumes (data) are kept
 	$(COMPOSE) down
 
 logs:
@@ -39,6 +39,5 @@ types: ## regenerate frontend API types from the running backend
 e2e: ## browser tests; needs backend (LLM_MODE=replay) on :8000 and frontend on :3000
 	cd frontend && pnpm exec playwright test
 
-reset: ## drop all data (asks for confirmation)
-	@read -p "This deletes ALL data volumes. Continue? [y/N] " a && [ "$$a" = "y" ]
-	$(COMPOSE) down -v
+reset: ## disabled: data must be preserved (see docs/DATA_INVENTORY.md)
+	@echo "'make reset' is disabled. Data is preserved; restore from backups/ with pg_restore if needed." && exit 1
