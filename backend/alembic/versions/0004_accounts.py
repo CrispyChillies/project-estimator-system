@@ -4,7 +4,6 @@ Revision ID: 0004
 Revises: 0003
 """
 from alembic import op
-
 from app.db import enums as E
 
 revision = "0004"
