@@ -1,4 +1,4 @@
-USER_ROLES = ("pm", "engineer", "admin")
+USER_ROLES = ("pm", "engineer", "admin", "member")
 PROJECT_STATUS = ("draft", "quoted", "won", "lost", "delivered")
 DATA_SOURCE = ("user", "dataset", "synthetic")
 ESTIMATE_STATUS = ("draft", "final")

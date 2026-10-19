@@ -36,8 +36,8 @@ lint:
 types: ## regenerate frontend API types from the running backend
 	cd frontend && pnpm exec openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.ts
 
-e2e: ## browser tests; needs backend (LLM_MODE=replay) on :8000 and frontend on :3000
-	cd frontend && pnpm exec playwright test
+e2e: ## browser tests on an isolated stack (separate DB calibr_e2e, fake LLM, random admin password)
+	frontend/e2e/run.sh
 
 reset: ## disabled: data must be preserved (see docs/DATA_INVENTORY.md)
 	@echo "'make reset' is disabled. Data is preserved; restore from backups/ with pg_restore if needed." && exit 1

@@ -62,6 +62,7 @@ class ProjectPatch(BaseModel):
     tech_tags: list[str] | None = None
     description: str | None = None
     status: ProjectStatus | None = None
+    shared_to_workspace: bool | None = None
 
 
 class ProjectOut(ORM):
@@ -76,6 +77,10 @@ class ProjectOut(ORM):
     started_at: datetime | None
     delivered_at: datetime | None
     created_at: datetime
+    owner_id: uuid.UUID | None = None
+    shared_to_workspace: bool = False
+    is_archive: bool = False
+    access: str | None = None
 
 
 class ProjectListItem(ProjectOut):

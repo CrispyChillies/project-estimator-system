@@ -43,6 +43,12 @@ def acquire_lock(db: Session, session_id: uuid.UUID) -> None:
         raise Conflict("A run is already in progress for this session")
 
 
+def check_user_can_run(db: Session, user_id: uuid.UUID | None) -> None:
+    from app.core.usage import check_concurrency
+
+    check_concurrency(db, user_id)
+
+
 def _set_state(session_id: uuid.UUID, state: str) -> None:
     with SessionLocal() as db:
         db.execute(update(AgentSession).where(AgentSession.id == session_id)
@@ -88,8 +94,10 @@ def _text(content: Any) -> str:
 def stream_run(session_id: uuid.UUID, text: str, user_id: uuid.UUID | None, idempotency_key: str | None = None,
                *, model=None) -> Iterator[str]:
     """Caller must hold the session lock (acquire_lock). Always releases it."""
+    from app.core.usage import use_llm_user
+
     try:
-        with SessionLocal() as db:
+        with SessionLocal() as db, use_llm_user(user_id):
             yield from _run(db, session_id, text, user_id, idempotency_key, model)
     except Exception as e:  # never leave the stream without a terminal event
         log.exception("agent run failed")

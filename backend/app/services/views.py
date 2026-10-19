@@ -53,8 +53,11 @@ def estimate_tree(db: Session, estimate_id: uuid.UUID) -> S.EstimateTree:
     return S.EstimateTree(estimate=S.EstimateOut.model_validate(est), modules=out_modules)
 
 
-def project_list(db: Session, status: str | None, search: str | None) -> list[S.ProjectListItem]:
+def project_list(db: Session, status: str | None, search: str | None,
+                 visible: list[uuid.UUID] | None = None) -> list[S.ProjectListItem]:
     q = select(Project).order_by(Project.created_at.desc())
+    if visible is not None:
+        q = q.where(Project.id.in_(visible))
     if status:
         q = q.where(Project.status == status)
     if search:

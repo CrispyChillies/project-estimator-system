@@ -15,8 +15,11 @@ log = logging.getLogger(__name__)
 Progress = Callable[[float, str], None]
 
 
-def create_job(db: Session, kind: str) -> Job:
-    job = Job(kind=kind, status="queued", progress=0.0)
+def create_job(db: Session, kind: str, user_id: uuid.UUID | None = None) -> Job:
+    from app.core.usage import check_concurrency
+
+    check_concurrency(db, user_id)
+    job = Job(kind=kind, status="queued", progress=0.0, user_id=user_id)
     db.add(job)
     db.commit()
     return job
@@ -41,7 +44,9 @@ def _update(job_id: uuid.UUID, **kw: object) -> None:
 def run_job(job_id: uuid.UUID, fn: Callable[[Session, Progress], str | None]) -> None:
     """Executes `fn(db, progress)` in its own session; result is a reference string (e.g. an id)."""
     _update(job_id, status="running", progress=0.01)
-    with SessionLocal() as db:
+    from app.core.usage import use_llm_user
+
+    with SessionLocal() as db, use_llm_user(db.get(Job, job_id).user_id):
         try:
             ref = fn(db, lambda p, msg="": _update(job_id, progress=float(min(max(p, 0), 0.99)), message=msg))
             db.commit()

@@ -1,42 +1,17 @@
 import uuid
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.agents.chat_agent import stream_agent
 from app.api.deps import current_user_id
-from app.db.models import AgentMessage, AgentSession, ChangeProposal
-from app.db.session import SessionLocal, get_db
+from app.db.models import ChangeProposal
+from app.db.session import get_db
 from app.schemas import api as S
-from app.services import estimates as es
 from app.services import proposals as pr
 from app.services.summary import compute_summary
 
 router = APIRouter(tags=["agent"])
-
-
-@router.post("/estimates/{estimate_id}/agent/messages")
-def post_message(estimate_id: uuid.UUID, body: S.AgentMessageIn, uid=Depends(current_user_id)):
-    """Server-Sent Events: session, token, tool, proposal, done, error."""
-
-    def gen():
-        with SessionLocal() as db:
-            es.get_estimate(db, estimate_id)
-            yield from stream_agent(db, estimate_id, body.session_id, body.text, uid)
-
-    return StreamingResponse(gen(), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
-
-@router.get("/estimates/{estimate_id}/agent/sessions/latest", response_model=list[S.AgentMessageOut])
-def latest_session_messages(estimate_id: uuid.UUID, db: Session = Depends(get_db)):
-    s = db.scalars(select(AgentSession).where(AgentSession.estimate_id == estimate_id)
-                   .order_by(AgentSession.created_at.desc())).first()
-    if s is None:
-        return []
-    return list(db.scalars(select(AgentMessage).where(AgentMessage.session_id == s.id).order_by(AgentMessage.created_at)))
 
 
 @router.get("/estimates/{estimate_id}/proposals", response_model=list[S.ProposalOut])

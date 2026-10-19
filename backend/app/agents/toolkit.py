@@ -15,6 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.agents import templates as T
+from app.core.access import pool_project_ids
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db.models import (
@@ -454,6 +455,7 @@ class Toolkit:
         card = prr.build_card(self.db, project, est)
         refs, err = prr.safe_retrieve(self.db, prr.card_text(card), get_params(self.db),
                                       exclude_project_id=project.id, tags=project.tech_tags, domain=project.domain,
+                                      eligible_project_ids=pool_project_ids(self.db, self.ctx.user_id),
                                       cat_share=card["category_share"], k=a.k, estimate_id=est.id,
                                       session_id=self.ctx.session.id)
         items = [{**r.to_dict(), "total_min": r.card["total_min"], "total_max": r.card["total_max"],
@@ -469,7 +471,8 @@ class Toolkit:
             return {"summary": "No embedding for this task", "data": []}
         cat = self.db.get(TaskCategory, t.category_id).key if t.category_id else "other"
         pid = self.db.get(Estimate, self.ctx.estimate_id).project_id
-        analogs = find_analogs(self.db, list(t.embedding), cat, exclude_project_id=pid, top_k=5)
+        analogs = find_analogs(self.db, list(t.embedding), cat, exclude_project_id=pid, top_k=5,
+                               allowed_project_ids=pool_project_ids(self.db, self.ctx.user_id))
         return {"summary": f"{len(analogs)} similar task(s)", "data": [x.to_dict() for x in analogs]}
 
     def explain_task(self, a: TaskRef, cid: str) -> dict:

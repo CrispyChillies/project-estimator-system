@@ -29,8 +29,8 @@ PRICES: dict[str, dict[str, float]] = {
 class BudgetExceeded(AppError):
     def __init__(self, scope: str, spent: float, limit: float):
         super().__init__("budget_exceeded",
-                         f"LLM budget exceeded for {scope}: spent ${spent:.4f} of ${limit:.2f}. "
-                         "Raise LLM_BUDGET_USD or the section budget deliberately; no fallback is attempted.",
+                         "The AI budget for this workspace is used up, so no AI request was sent. "
+                         f"An administrator can raise it ({scope}: ${spent:.2f} of ${limit:.2f}).",
                          402, {"scope": scope, "spent": spent, "limit": limit})
 
 
@@ -137,6 +137,9 @@ def check(estimated: float = 0.0) -> None:
     for s in reversed(_sections.get()):
         if (total - s.start) + estimated >= s.limit - EPS:
             raise BudgetExceeded(f"section '{s.name}'", total - s.start, s.limit)
+    from app.core.usage import check_user_allowance
+
+    check_user_allowance(estimated)
 
 
 def estimate_tokens(text: str) -> int:

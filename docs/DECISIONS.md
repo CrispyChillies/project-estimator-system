@@ -128,3 +128,30 @@ Short log of choices made where the brief was ambiguous or reality forced a devi
     buttons always reflect the operation's current status. One session per estimate is auto-created, titled
     after the uploaded files; the panel auto-opens after generation and toggles with Ctrl/⌘+J. The legacy
     proposal card remains only for "answer a clarifying question" in the Questions tab.
+45. **Accounts**: server-side sessions (opaque token, HMAC-SHA256 digest stored, 7-day sliding expiry) in an HTTP-only
+    `SameSite=Lax` cookie; argon2id passwords (min 10 chars); double-submit CSRF (`calibr_csrf` cookie echoed as
+    `X-CSRF-Token`) enforced by middleware on every non-GET `/api/*` call; login throttling (5 failures / 15 min per
+    IP+email, exponential backoff) with one generic error message. The API is reached through Next.js rewrites so all
+    cookies are first-party (no cross-site cookies, CORS only for local tools).
+46. **Authorization is central**: one router-level guard resolves every id in the path (project, estimate, task,
+    module, document, session, operation, batch, memory, proposal, question, unplanned, job, backtest run, rule) to its
+    project/owner and checks access — 404 when invisible (no id probing), 403 for viewer writes. List endpoints
+    filter by visibility. Cross-user tests in `backend/tests/test_authz.py`.
+47. **Archive ownership**: pre-account projects are flagged `is_archive` by migration 0004 and assigned to the first
+    admin at startup (idempotent backfill of rows without an owner). Pre-account users are kept as archived, inactive
+    accounts (no password) so edit-log foreign keys stay valid.
+48. **Learning pools**: admin = everything (stored calibration tables). Members: own + shared-with-me +
+    `shared_to_workspace` projects (+ the archive only if the admin switch is on); their calibration stats are
+    computed on demand from that pool, their rules/lessons are owner-scoped, and their calibration history is written
+    as owner-scoped `calibration_runs`. Rates and categories are workspace reference data, editable by admins only.
+49. **Cost locks**: model/provider/mode/budget come only from the environment; request bodies containing such keys are
+    rejected with 400 (`model_locked`) and logged. Per-user daily cap (`USER_DAILY_USD_CAP`, admin-adjustable per
+    user up to the global cap), per-user hourly limit on AI-triggering endpoints (in-process sliding window, so
+    approximate across workers), max concurrent AI runs per user, global `LLM_BUDGET_USD`. Production refuses to
+    start unless `LLM_MODE=live`, a 32+ char `SESSION_SECRET` and the OpenAI settings are present.
+50. **Destructive operations removed**: `make reset` is disabled, the "reset learned data" endpoint is gone, and
+    startup no longer replaces stored calibration with empty stats when the active model has no history (this
+    happened once during this work when a server was started in fake mode against the dev DB; the stats were
+    recomputed deterministically from the preserved records, see DATA_INVENTORY.md).
+51. **Browser tests run on an isolated stack** (`frontend/e2e/run.sh`): a copy of the archive in `calibr_e2e`, fake
+    LLM, a random admin password per run, separate Next build dir, so they never touch the dev data.

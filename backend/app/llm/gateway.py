@@ -112,7 +112,10 @@ class LLMGateway:
         p.write_text(json.dumps({"purpose": purpose, "value": value}, default=str))
 
     def log_call(self, **kw: Any) -> None:
+        from app.core.usage import llm_user
+
         kw.setdefault("model_key", self.model_key)
+        kw.setdefault("user_id", llm_user())
         kw.setdefault("section", budget.current_section())
         cost = float(kw.get("cost_usd") or 0.0)
         if cost > 0:

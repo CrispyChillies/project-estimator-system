@@ -5,7 +5,7 @@ import { ArrowUpDown, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import { DataSourceBadge, EmptyState, ErrorState, PageHeader, StatusBadge } from "@/components/common";
+import { EmptyState, ErrorState, PageHeader, StatusBadge } from "@/components/common";
 import { NewProjectDialog } from "@/components/projects/new-project-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,6 @@ const columns = helper.columns([
         <Link href={`/projects/${c.row.original.id}`} className="font-medium hover:underline">
           {c.getValue()}
         </Link>
-        <DataSourceBadge source={c.row.original.data_source} />
       </div>
     ),
   }),

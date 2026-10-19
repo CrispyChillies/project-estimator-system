@@ -21,6 +21,15 @@ USERS = [
 HISTORY_EMAIL = "history@calibr.local"
 
 
+def ensure_archive_users(db: Session) -> None:
+    """Authors of the archived test data. They exist for edit-log integrity and can never sign in."""
+    existing_users = {u.email for u in db.scalars(select(User))}
+    for name, email, role in USERS:
+        if email not in existing_users:
+            db.add(User(name=name, email=email, role=role, is_active=False, archived=True))
+    db.commit()
+
+
 def ensure_reference_data(db: Session) -> None:
     existing_roles = {r.name for r in db.scalars(select(DeliveryRole))}
     for name, rate, color in ROLES:
@@ -30,10 +39,6 @@ def ensure_reference_data(db: Session) -> None:
     for key, (name, desc) in CATEGORY_NAMES.items():
         if key not in existing_cats:
             db.add(TaskCategory(key=key, name=name, description=desc))
-    existing_users = {u.email for u in db.scalars(select(User))}
-    for name, email, role in USERS:
-        if email not in existing_users:
-            db.add(User(name=name, email=email, role=role))
     if db.get(Setting, "learning") is None:
         db.add(Setting(key="learning", value=DEFAULTS.model_dump()))
     db.commit()

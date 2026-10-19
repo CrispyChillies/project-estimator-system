@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import current_user_id
 from app.core.errors import AppError
+from app.core.usage import AIRateLimit
 from app.db.models import Assumption, Estimate
 from app.db.session import get_db
 from app.schemas import api as S
@@ -28,10 +29,11 @@ def _done(db: Session, estimate_id: uuid.UUID) -> None:
     db.commit()
 
 
-@router.post("/projects/{project_id}/estimates/generate", response_model=S.JobOut, status_code=202)
+@router.post("/projects/{project_id}/estimates/generate", response_model=S.JobOut, status_code=202,
+             dependencies=[AIRateLimit])
 def start_generation(project_id: uuid.UUID, body: S.GenerateIn, bg: BackgroundTasks, db: Session = Depends(get_db),
                      uid=Depends(current_user_id)):
-    job = jobs.create_job(db, "generate_estimate")
+    job = jobs.create_job(db, "generate_estimate", uid)
 
     def work(s: Session, progress):
         est = generate(s, project_id, body.document_ids, body.learning, uid, progress)
@@ -67,8 +69,9 @@ def get_references(estimate_id: uuid.UUID, db: Session = Depends(get_db)) -> dic
 
 @router.get("/estimates/{estimate_id}/similar-projects")
 def similar_projects(estimate_id: uuid.UUID, k: int | None = Query(None, ge=0, le=10),
-                     db: Session = Depends(get_db)) -> dict:
+                     db: Session = Depends(get_db), uid=Depends(current_user_id)) -> dict:
     """Live retrieval against the current state of the estimate (used by the agent and the References card)."""
+    from app.core.access import pool_project_ids
     from app.db.models import Project
     from app.services import project_retrieval as pr
     from app.services.settings import get_params
@@ -77,6 +80,7 @@ def similar_projects(estimate_id: uuid.UUID, k: int | None = Query(None, ge=0, l
     project = db.get(Project, est.project_id)
     card = pr.build_card(db, project, est)
     refs, err = pr.safe_retrieve(db, pr.card_text(card), get_params(db), exclude_project_id=project.id,
+                                 eligible_project_ids=pool_project_ids(db, uid),
                                  tags=project.tech_tags, domain=project.domain, cat_share=card["category_share"],
                                  k=k, estimate_id=est.id)
     db.commit()
@@ -196,7 +200,8 @@ def bulk(estimate_id: uuid.UUID, body: S.BulkIn, db: Session = Depends(get_db), 
     _done(db, estimate_id)
 
 
-@router.post("/estimates/{estimate_id}/tasks/estimate", response_model=S.JobOut, status_code=202)
+@router.post("/estimates/{estimate_id}/tasks/estimate", response_model=S.JobOut, status_code=202,
+             dependencies=[AIRateLimit])
 def estimate_added(estimate_id: uuid.UUID, body: S.EstimateAddedIn, bg: BackgroundTasks, db: Session = Depends(get_db),
                    uid=Depends(current_user_id)):
     """Background AI estimate for added tasks (given ids, or every added task still at 0 h)."""
@@ -204,7 +209,7 @@ def estimate_added(estimate_id: uuid.UUID, body: S.EstimateAddedIn, bg: Backgrou
     ids = added_tasks.pending_task_ids(db, estimate_id, body.task_ids)
     if not ids:
         raise AppError("nothing_to_estimate", "No added tasks need an AI estimate", 422)
-    job = jobs.create_job(db, "estimate_added_tasks")
+    job = jobs.create_job(db, "estimate_added_tasks", uid)
     bg.add_task(jobs.run_job, job.id, lambda s, progress: added_tasks.estimate_added_tasks(s, estimate_id, ids, uid, progress))
     return job
 

@@ -10,9 +10,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.agents.runtime import acquire_lock, stream_run
+from app.agents.runtime import acquire_lock, check_user_can_run, stream_run
 from app.api.deps import current_user_id
 from app.core.errors import AppError, NotFound
+from app.core.usage import AIRateLimit
 from app.db.models import AgentMessage, AgentOperation, AgentSession, ProjectMemory
 from app.db.session import get_db
 from app.services import estimates as es
@@ -134,11 +135,12 @@ def session_operations(session_id: uuid.UUID, db: Session = Depends(get_db)) -> 
 
 
 # ---------- runs ----------
-@router.post("/agent/sessions/{session_id}/runs")
+@router.post("/agent/sessions/{session_id}/runs", dependencies=[AIRateLimit])
 def start_run(session_id: uuid.UUID, body: RunIn, db: Session = Depends(get_db), uid=Depends(current_user_id)):
     """SSE stream; 409 if a run is already active for this session. Contract: docs/AGENT_PROTOCOL.md."""
     s = _session(db, session_id)
     es.ensure_draft(db, s.estimate_id)
+    check_user_can_run(db, uid)
     acquire_lock(db, s.id)
     return StreamingResponse(stream_run(s.id, body.text, uid, body.idempotency_key), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

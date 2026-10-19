@@ -6,7 +6,7 @@ import { useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 
-import { EmptyState, ModelStatusBanner, PageHeader } from "@/components/common";
+import { EmptyState, PageHeader } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -170,7 +170,6 @@ export default function InsightsPage() {
     return (
       <div>
         <PageHeader title="Insights" />
-        <ModelStatusBanner />
         <EmptyState title="Nothing learned yet" description="Finalize an estimate or run `make seed` to load history." />
       </div>
     );
@@ -181,7 +180,6 @@ export default function InsightsPage() {
         title="What the system has learned"
         description="Calibration factors are exp(μ̃) of log(reference / raw LLM), with hierarchical shrinkage."
       />
-      <ModelStatusBanner />
       {anyDemo && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
           Includes demo/synthetic history. Synthetic results demonstrate the mechanism, not real-world accuracy.

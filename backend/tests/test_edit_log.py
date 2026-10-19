@@ -24,7 +24,7 @@ Maybe a recommendation engine later?
 
 
 def _project(db):
-    p = Project(name="Test", status="draft", data_source="user")
+    p = Project(name="Test", status="draft", data_source="user", owner_id=_user(db).id)
     db.add(p)
     db.commit()
     return p

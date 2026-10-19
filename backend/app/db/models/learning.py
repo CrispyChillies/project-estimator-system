@@ -55,6 +55,7 @@ class CalibrationRun(IdMixin, TimestampMixin, Base):
         enum_check("calibration_runs", "trigger", E.RUN_TRIGGER),
     )
     trigger: Mapped[str] = mapped_column(String(30))
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
     layer: Mapped[str] = mapped_column(String(10))
     project_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL"))
     stats_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
@@ -67,6 +68,7 @@ class LearnedRule(IdMixin, TimestampMixin, Base):
         enum_check("learned_rules", "layer", E.LAYER),
     )
     text: Mapped[str] = mapped_column(Text)
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
     layer: Mapped[str] = mapped_column(String(10))
     scope: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     evidence_event_ids: Mapped[list[uuid.UUID]] = mapped_column(ARRAY(UUID(as_uuid=True)), default=list)
@@ -91,6 +93,7 @@ class LLMCall(IdMixin, TimestampMixin, Base):
     reasoning_tokens: Mapped[int] = mapped_column(Integer, default=0)
     request: Mapped[Any] = mapped_column(JSONB, nullable=True)
     response: Mapped[Any] = mapped_column(JSONB, nullable=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
 
 
 class LLMRawEstimate(IdMixin, TimestampMixin, Base):
@@ -112,6 +115,7 @@ class BacktestRun(IdMixin, TimestampMixin, Base):
     config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     status: Mapped[str] = mapped_column(String(10), default="queued")
     summary: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
 
 
 class BacktestResult(IdMixin, TimestampMixin, Base):
@@ -140,4 +144,5 @@ class Job(IdMixin, TimestampMixin, Base):
     message: Mapped[str] = mapped_column(Text, default="")
     error: Mapped[str | None] = mapped_column(Text)
     result_ref: Mapped[str | None] = mapped_column(String(200))
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

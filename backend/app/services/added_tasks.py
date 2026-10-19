@@ -46,7 +46,10 @@ def estimate_added_tasks(db: Session, estimate_id: uuid.UUID, task_ids: list[uui
     tasks = [t for t in tasks if t is not None and t.estimate_id == estimate_id]
 
     progress(0.1, f"Preparing {len(tasks)} task(s)")
-    rules = [r.text for r in active_rules(db)] if est.learning_enabled else []
+    from app.core.access import pool_project_ids
+
+    pool = pool_project_ids(db, user_id)
+    rules = [r.text for r in active_rules(db, user_id)] if est.learning_enabled else []
     items = []
     for i, t in enumerate(tasks):
         cat = id2cat.get(t.category_id) if t.category_id else None
@@ -69,11 +72,12 @@ def estimate_added_tasks(db: Session, estimate_id: uuid.UUID, task_ids: list[uui
 
     progress(0.7, "Retrieving analogs and calibrating")
     vectors = gw.embed([f"{it['title']}\n{it['description']}" for it in items])
-    edit_stats, actual_stats = load_stats(db) if est.learning_enabled else ({}, {})
+    edit_stats, actual_stats = load_stats(db, pool) if est.learning_enabled else ({}, {})
     author = str(user_id) if user_id else None
     for t, it, vec in zip(tasks, items, vectors, strict=True):
         rmin, rmax = raw[it["key"]]
-        analogs = find_analogs(db, vec, it["category_key"], exclude_project_id=est.project_id, top_k=p.analog_top_k) \
+        analogs = find_analogs(db, vec, it["category_key"], exclude_project_id=est.project_id, top_k=p.analog_top_k,
+                               allowed_project_ids=pool) \
             if est.learning_enabled else []
         pred = predict_task(rmin, rmax, it["category_key"], author, analogs, edit_stats, actual_stats, p,
                             learning=est.learning_enabled)

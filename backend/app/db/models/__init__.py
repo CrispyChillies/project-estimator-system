@@ -27,12 +27,21 @@ from app.db.models.learning import (
     UnplannedActual,
 )
 from app.db.models.project import Document, DocumentChunk, Project
-from app.db.models.reference import DeliveryRole, Setting, TaskCategory, User
+from app.db.models.reference import (
+    AuthSession,
+    DeliveryRole,
+    LoginAttempt,
+    PasswordReset,
+    ProjectMember,
+    Setting,
+    TaskCategory,
+    User,
+)
 
 __all__ = [
     "AgentMessage", "AgentOperation", "AgentSession", "ProjectEmbedding", "ProjectMemory", "RetrievalLog", "Assumption", "BacktestResult", "BacktestRun", "CalibrationRun",
     "CalibrationStat", "ChangeProposal", "ClarifyingQuestion", "DeliveryRole", "Document",
     "DocumentChunk", "EditEvent", "Estimate", "Job", "LLMCall", "LLMRawEstimate", "LearnedRule",
     "Module", "Project", "Setting", "Task", "TaskAIBaseline", "TaskActual", "TaskCategory",
-    "UnplannedActual", "User",
+    "UnplannedActual", "User", "AuthSession", "LoginAttempt", "PasswordReset", "ProjectMember",
 ]

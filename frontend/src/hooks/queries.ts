@@ -22,7 +22,6 @@ import type {
   EstimateTree,
   Job,
   LearningSettings,
-  LLMUsage,
   Project,
   ProjectListItem,
   Proposal,
@@ -34,7 +33,6 @@ import type {
   TaskPatch,
   TimelinePoint,
   Unplanned,
-  User,
 } from "@/lib/types";
 
 export function errorToast(e: unknown) {
@@ -50,7 +48,6 @@ export const qk = {
   summary: (id: string) => ["summary", id] as const,
 };
 
-export const useUsers = () => useQuery({ queryKey: ["users"], queryFn: () => api<User[]>("/users"), staleTime: 60_000 });
 export const useRoles = () => useQuery({ queryKey: ["roles"], queryFn: () => api<Role[]>("/roles"), staleTime: 60_000 });
 export const useCategories = () =>
   useQuery({ queryKey: ["categories"], queryFn: () => api<Category[]>("/categories"), staleTime: 60_000 });
@@ -155,18 +152,8 @@ export const useBacktestRun = (id: string | null) =>
   useQuery({ queryKey: ["backtest-run", id], queryFn: () => api<BacktestDetail>(`/backtest/runs/${id}`), enabled: !!id });
 
 export const useLearningSettings = () =>
-  useQuery({ queryKey: ["learning-settings"], queryFn: () => api<LearningSettings>("/settings/learning") });
-export const useLLMUsage = () => useQuery({ queryKey: ["llm-usage"], queryFn: () => api<LLMUsage>("/llm/usage") });
+  useQuery({ queryKey: ["learning-settings"], queryFn: () => api<LearningSettings>("/admin/learning") });
 
-export interface ModelStatus {
-  active_model_key: string;
-  calibration_model_key: string | null;
-  final_estimates_by_key: Record<string, number>;
-  active_history: number;
-  restarted: boolean;
-}
-export const useModelStatus = () =>
-  useQuery({ queryKey: ["model-status"], queryFn: () => api<ModelStatus>("/insights/model-status") });
 
 export interface AdminUsage {
   total_cost_usd: number;

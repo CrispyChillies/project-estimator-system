@@ -5,7 +5,7 @@ import { Bot, Copy, Download, GitCompare, Loader2, Lock, Sparkles } from "lucide
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { EmptyState, ErrorState, ModelStatusBanner, StatusBadge } from "@/components/common";
+import { EmptyState, ErrorState, StatusBadge } from "@/components/common";
 import { AddTaskDialog } from "@/components/estimate/add-task-dialog";
 import { AgentPanel } from "@/components/estimate/agent-panel";
 import { EstimateTable, type Highlight } from "@/components/estimate/estimate-table";
@@ -353,7 +353,6 @@ export function EstimateTab({
 
   return (
     <div className="space-y-3">
-      <ModelStatusBanner />
       {toolbar}
       {agent && estimateId ? (
         <ResizablePanelGroup orientation="horizontal" className="h-[calc(100vh-11rem)] min-h-[560px] rounded-lg border">

@@ -44,7 +44,7 @@ import {
   useDeleteSession,
   usePatchSession,
 } from "@/hooks/agent";
-import { errorToast, useDocuments, useInvalidateEstimate, useLLMUsage } from "@/hooks/queries";
+import { errorToast, useDocuments, useInvalidateEstimate } from "@/hooks/queries";
 import { api, postSSE } from "@/lib/api";
 import type { AgentMsg, AgentOperationOut, ReferenceProject, ToolLogEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -282,8 +282,6 @@ export function AgentPanel({
   const invalidate = useInvalidateEstimate();
   const { data: sessions } = useAgentSessions(estimateId);
   const { data: docs } = useDocuments(projectId);
-  const { data: usage } = useLLMUsage();
-  const offline = !!usage && !(["live", "record"] as string[]).includes(usage.mode);
   const [picked, setPicked] = useState<string | null>(() =>
     typeof window === "undefined" ? null : window.localStorage.getItem(sessionKey(estimateId)),
   );
@@ -480,11 +478,6 @@ export function AgentPanel({
       <div className="flex items-center gap-1.5">
         <Bot className="size-4" />
         <span className="font-medium">Agent</span>
-        {offline && (
-          <Badge variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-400">
-            offline planner
-          </Badge>
-        )}
         <div className="ml-auto flex items-center gap-1">
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button size="xs" variant="outline" className="max-w-44" />}>
@@ -670,7 +663,7 @@ export function AgentPanel({
       <div className="flex justify-between text-[11px] text-muted-foreground">
         <span>{session?.apply_mode === "review" ? "Review mode: every change waits for you" : "Auto mode: safe changes apply"}</span>
         <span className="tabular-nums" data-testid="agent-cost">
-          {offline ? "offline · $0" : `$${(session?.cost_usd ?? 0).toFixed(4)} · ${((session?.tokens ?? 0) / 1000).toFixed(1)}k tok`}
+          AI use this session ${(session?.cost_usd ?? 0).toFixed(3)}
         </span>
       </div>
       {session && (

@@ -5,7 +5,7 @@ import { AlertTriangle, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 
-import { DataSourceBadge, EmptyState, JobProgress, PageHeader } from "@/components/common";
+import { EmptyState, JobProgress, PageHeader } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -186,7 +186,6 @@ export default function BacktestPage() {
               <ToggleGroupItem value="project">Project totals</ToggleGroupItem>
               <ToggleGroupItem value="task">Tasks</ToggleGroupItem>
             </ToggleGroup>
-            {summary?.data_sources.map((s) => <DataSourceBadge key={s} source={s} />)}
           </div>
           {summary?.small_sample && (
             <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
@@ -271,7 +270,7 @@ export default function BacktestPage() {
                     <TableRow key={p.project_id}>
                       <TableCell>
                         <div className="flex items-center gap-1.5">
-                          {p.name} <DataSourceBadge source={p.data_source} />
+                          {p.name}
                         </div>
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{p.n_train}</TableCell>

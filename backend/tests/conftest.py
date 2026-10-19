@@ -46,12 +46,13 @@ def db():
 
     from app.db.base import Base
     from app.db.session import SessionLocal, engine
-    from app.services.reference import ensure_reference_data
+    from app.services.reference import ensure_archive_users, ensure_reference_data
 
     with engine.begin() as c:
         names = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
         c.execute(text(f"TRUNCATE {names} CASCADE"))
     s = SessionLocal()
     ensure_reference_data(s)
+    ensure_archive_users(s)
     yield s
     s.close()

@@ -1,15 +1,28 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const BASE = `${API_URL}/api/v1`;
+// The API is served from the same site (Next.js rewrites /api/* to the backend), so the HTTP-only session cookie
+// and the CSRF cookie are first-party.
+const BASE = "/api/v1";
 
-const USER_KEY = "calibr.userId"; // UI preference only (demo user switcher)
-
-export function getUserId(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(USER_KEY);
+function csrfToken(): string {
+  if (typeof document === "undefined") return "";
+  const m = document.cookie.match(/(?:^|; )calibr_csrf=([^;]*)/);
+  return m ? decodeURIComponent(m[1]) : "";
 }
 
-export function setUserId(id: string) {
-  window.localStorage.setItem(USER_KEY, id);
+let csrfPromise: Promise<void> | null = null;
+export async function ensureCsrf(): Promise<void> {
+  if (csrfToken()) return;
+  csrfPromise ??= fetch(`${BASE}/auth/csrf`, { credentials: "same-origin" }).then(() => undefined);
+  await csrfPromise;
+  csrfPromise = null;
+}
+
+const PUBLIC_PATHS = ["/", "/signin", "/signup", "/reset", "/help"];
+function onUnauthorized() {
+  if (typeof window === "undefined") return;
+  const path = window.location.pathname;
+  if (PUBLIC_PATHS.some((p) => path === p || (p !== "/" && path.startsWith(p)))) return;
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full reload drops cached private data
+  window.location.href = `/signin?next=${encodeURIComponent(path + window.location.search)}`;
 }
 
 export class ApiError extends Error {
@@ -23,22 +36,24 @@ export class ApiError extends Error {
   }
 }
 
-function headers(extra?: HeadersInit): Headers {
+function headers(extra?: HeadersInit, method = "GET"): Headers {
   const h = new Headers(extra);
-  const uid = getUserId();
-  if (uid) h.set("X-User-Id", uid);
+  if (method !== "GET" && method !== "HEAD") h.set("X-CSRF-Token", csrfToken());
   return h;
 }
 
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, ...rest } = init;
-  const h = headers(rest.headers);
+  const method = (rest.method ?? "GET").toUpperCase();
+  if (method !== "GET") await ensureCsrf();
+  const h = headers(rest.headers, method);
   let body = rest.body;
   if (json !== undefined) {
     h.set("Content-Type", "application/json");
     body = JSON.stringify(json);
   }
-  const res = await fetch(`${BASE}${path}`, { ...rest, headers: h, body });
+  const res = await fetch(`${BASE}${path}`, { ...rest, headers: h, body, credentials: "same-origin" });
+  if (res.status === 401 && !path.startsWith("/auth/")) onUnauthorized();
   if (!res.ok) {
     let code = "http_error";
     let message = `${res.status} ${res.statusText}`;
@@ -66,8 +81,16 @@ export interface SSEHandlers {
 
 /** POST that returns text/event-stream; parses events incrementally. */
 export async function postSSE(path: string, json: unknown, { onEvent, signal }: SSEHandlers) {
-  const h = headers({ "Content-Type": "application/json" });
-  const res = await fetch(`${BASE}${path}`, { method: "POST", headers: h, body: JSON.stringify(json), signal });
+  await ensureCsrf();
+  const h = headers({ "Content-Type": "application/json", Accept: "text/event-stream" }, "POST");
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: h,
+    body: JSON.stringify(json),
+    signal,
+    credentials: "same-origin",
+  });
+  if (res.status === 401) onUnauthorized();
   if (!res.ok || !res.body) {
     let code = "stream_error";
     let message = "Agent request failed";

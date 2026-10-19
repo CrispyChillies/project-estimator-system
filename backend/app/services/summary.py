@@ -46,7 +46,11 @@ def compute_summary(db: Session, estimate_id: uuid.UUID, *, persist: bool = True
         cal = (b.provenance or {}).get("calibration") if b else None
         sigma = cal["sigma"] if cal and cal.get("sigma") else raw_sigma(t.min_hours, t.max_hours, p)
         sim_tasks.append(SimTask(mid=m, category=id2cat.get(t.category_id, "other"), sigma=sigma))
-    _, actual = load_stats(db)
+    from app.core.access import pool_project_ids
+    from app.db.models import Project
+
+    owner = db.scalar(select(Project.owner_id).where(Project.id == est.project_id))
+    _, actual = load_stats(db, pool_project_ids(db, owner))
     sim = simulate(sim_tasks, actual, p, seed=int(uuid.UUID(str(estimate_id)).int % 2**31))
     summary = {
         "total_min": sum(t.min_hours for t in tasks), "total_max": sum(t.max_hours for t in tasks),

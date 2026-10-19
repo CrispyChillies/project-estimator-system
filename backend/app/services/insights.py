@@ -11,9 +11,22 @@ from app.services.actuals import accuracy
 from app.services.learning import load_records, structural_signals
 
 
-def calibration_overview(db: Session) -> list[dict]:
-    rows = list(db.scalars(select(CalibrationStat).order_by(CalibrationStat.layer, CalibrationStat.scope_type,
-                                                            CalibrationStat.scope_key)))
+def calibration_overview(db: Session, pool: list | None = None) -> list[dict]:
+    if pool is None:
+        rows = list(db.scalars(select(CalibrationStat).order_by(CalibrationStat.layer, CalibrationStat.scope_type,
+                                                                CalibrationStat.scope_key)))
+    else:
+        from datetime import UTC, datetime
+        from types import SimpleNamespace
+
+        from app.services.learning import load_stats
+
+        edit, actual = load_stats(db, pool)
+        now = datetime.now(UTC)
+        rows = [SimpleNamespace(layer=st.layer, scope_type=st.scope_type, scope_key=st.scope_key, n=st.n,
+                                mean_log_ratio=st.mean, shrunk_mean=st.shrunk_mean, shrunk_var=st.shrunk_var,
+                                updated_at=now)
+                for stats in (edit, actual) for st in stats.values() if st.scope_type in ("global", "category")]
     out = []
     for s in rows:
         se = math.sqrt(s.shrunk_var / max(s.n, 1))
@@ -27,9 +40,13 @@ def calibration_overview(db: Session) -> list[dict]:
     return out
 
 
-def timeline(db: Session) -> list[dict]:
-    runs = list(db.scalars(select(CalibrationRun).where(CalibrationRun.trigger != "backtest")
-                           .order_by(CalibrationRun.created_at)))
+def timeline(db: Session, owner_id=None, admin: bool = True) -> list[dict]:
+    q = select(CalibrationRun).where(CalibrationRun.trigger != "backtest").order_by(CalibrationRun.created_at)
+    if admin:
+        q = q.where((CalibrationRun.owner_id.is_(None)) | (CalibrationRun.owner_id == owner_id))
+    else:
+        q = q.where(CalibrationRun.owner_id == owner_id)
+    runs = list(db.scalars(q))
     out = []
     for r in runs:
         stats = (r.stats_snapshot or {}).get("stats", {})
@@ -42,8 +59,11 @@ def timeline(db: Session) -> list[dict]:
     return out
 
 
-def accuracy_over_time(db: Session) -> list[dict]:
-    projects = list(db.scalars(select(Project).where(Project.status == "delivered").order_by(Project.delivered_at)))
+def accuracy_over_time(db: Session, pool: list | None = None) -> list[dict]:
+    q = select(Project).where(Project.status == "delivered").order_by(Project.delivered_at)
+    if pool is not None:
+        q = q.where(Project.id.in_(pool))
+    projects = list(db.scalars(q))
     out = []
     for p in projects:
         try:
@@ -56,5 +76,5 @@ def accuracy_over_time(db: Session) -> list[dict]:
     return out
 
 
-def structural(db: Session) -> dict:
-    return structural_signals(load_records(db))
+def structural(db: Session, pool: list | None = None) -> dict:
+    return structural_signals(load_records(db, pool) if pool is None or pool else [])

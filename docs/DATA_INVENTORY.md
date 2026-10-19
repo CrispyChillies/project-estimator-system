@@ -43,3 +43,13 @@ and compared with `... compare <before> <after>` (exit 1 if any table shrank).
 | tasks | 581 |
 | unplanned_actuals | 44 |
 | users | 4 |
+
+## After migration 0004 (accounts) — `post-accounts`
+
+All tables unchanged or larger (`users` +1: the admin). New empty tables: `sessions`, `project_members`,
+`login_attempts`, `password_resets`.
+
+Incident (recovered): a test server started with `LLM_MODE=fake` against the dev database recomputed
+`calibration_stats` for the fake model key (63 → 0 rows). These rows are derived data; they were recomputed from the
+preserved edit/actual records for the real model key (back to 63, check snapshot `check2`), and startup now refuses to
+replace stored stats with empty ones. No source data (projects, edits, actuals, documents) was affected.

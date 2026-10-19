@@ -2,7 +2,6 @@ import type { components } from "./api-types";
 
 type S = components["schemas"];
 
-export type User = S["UserOut"];
 export type Role = S["RoleOut"];
 export type Category = S["CategoryOut"];
 export type Project = S["ProjectOut"];
@@ -25,7 +24,6 @@ export type Unplanned = S["UnplannedOut"];
 export type Rule = S["RuleOut"];
 export type BacktestRun = S["BacktestRunOut"];
 export type BacktestDetail = S["BacktestDetail"];
-export type LLMUsage = S["LLMUsage"];
 export type CompareOut = S["CompareOut"];
 export type ReasonTag = NonNullable<S["TaskPatch"]["reason_tag"]>;
 

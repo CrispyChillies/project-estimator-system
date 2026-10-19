@@ -35,6 +35,30 @@ class Settings(BaseSettings):
     agent_history_token_budget: int = 6000
     agent_recent_edit_minutes: int = 30
     agent_run_lock_stale_s: int = 300
+    # --- deployment / accounts ---
+    app_env: str = "development"  # development | test | production
+    session_secret: str = ""
+    session_days: int = 7
+    cookie_secure: bool | None = None  # default: True in production
+    admin_email: str = ""
+    admin_password: str = ""
+    signup_mode: str = "invite"  # open | invite | closed
+    invite_code: str = ""
+    public_app_url: str = "http://localhost:3000"
+    robots_index: bool = False
+    # --- cost protection ---
+    user_daily_usd_cap: float = 0.50
+    user_hourly_requests: int = 60
+    max_concurrent_runs_per_user: int = 2
+    max_request_tokens: int = 60_000
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env == "production"
+
+    @property
+    def secure_cookies(self) -> bool:
+        return self.is_production if self.cookie_secure is None else self.cookie_secure
 
 
 @lru_cache

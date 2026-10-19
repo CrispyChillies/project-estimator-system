@@ -65,8 +65,8 @@ def delete_unplanned(unplanned_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/projects/{project_id}/deliver", response_model=S.ProjectOut)
-def deliver(project_id: uuid.UUID, db: Session = Depends(get_db)):
-    p = deliver_project(db, project_id)
+def deliver(project_id: uuid.UUID, db: Session = Depends(get_db), uid=Depends(current_user_id)):
+    p = deliver_project(db, project_id, user_id=uid)
     db.commit()
     return p
 

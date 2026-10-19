@@ -66,7 +66,12 @@ def generate(db: Session, project_id: uuid.UUID, document_ids: list[uuid.UUID], 
     roles = [r.name for r in db.scalars(select(DeliveryRole).order_by(DeliveryRole.name))]
     _, cat2id = category_maps(db)
     _, role2id = role_maps(db)
-    rules = active_rules(db) if learning else []
+    from app.core.access import pool_project_ids
+
+    pool = pool_project_ids(db, user_id)
+    if eligible_project_ids is not None:
+        pool = [i for i in eligible_project_ids if pool is None or i in set(pool)]
+    rules = active_rules(db, user_id) if learning else []
     rule_texts = [r.text for r in rules]
 
     progress(0.1, "Extracting requirements")
@@ -80,7 +85,7 @@ def generate(db: Session, project_id: uuid.UUID, document_ids: list[uuid.UUID], 
         query = "\n".join([project.name, project.domain, ", ".join(project.tech_tags or []), project.description,
                            ex.summary, *(r.text for r in ex.requirements)])
         refs, retrieval_error = pr.safe_retrieve(db, query, p, exclude_project_id=project_id,
-                                                 eligible_project_ids=eligible_project_ids,
+                                                 eligible_project_ids=pool,
                                                  tags=project.tech_tags, domain=project.domain)
     block = pr.references_block(refs, p.retrieval_token_cap)
 
@@ -123,7 +128,7 @@ def generate(db: Session, project_id: uuid.UUID, document_ids: list[uuid.UUID], 
 
     progress(0.65, "Retrieving analogs and calibrating")
     vectors = gw.embed([f"{t['title']}\n{t['description']}" for t in task_dicts])
-    edit_stats, actual_stats = load_stats(db) if learning else ({}, {})
+    edit_stats, actual_stats = load_stats(db, pool) if learning else ({}, {})
     author = str(user_id) if user_id else None
     modules: dict[str, uuid.UUID] = {}
     by_key: dict[str, float] = {}
@@ -132,7 +137,8 @@ def generate(db: Session, project_id: uuid.UUID, document_ids: list[uuid.UUID], 
             desc = next((m.description for m in deco.modules if m.name == td["module"]), "")
             modules[td["module"]] = es.create_module(db, est.id, td["module"], es.SYSTEM, desc, log=False).id
         rmin, rmax = raw[td["key"]]
-        analogs = find_analogs(db, vec, td["category_key"], exclude_project_id=project_id, top_k=p.analog_top_k) \
+        analogs = find_analogs(db, vec, td["category_key"], exclude_project_id=project_id, top_k=p.analog_top_k,
+                               allowed_project_ids=pool) \
             if learning else []
         pred = predict_task(rmin, rmax, td["category_key"], author, analogs if p.analog_blend_enabled else [],
                             edit_stats, actual_stats, p, learning=learning)

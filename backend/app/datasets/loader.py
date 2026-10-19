@@ -61,7 +61,7 @@ def load_project(db: Session, sp: SynthProject, data_source: str, *, model_label
     _, role2id = role_maps(db)
     p = Project(name=sp.name, client_name=sp.client, domain=sp.domain, description=sp.brief[:500], status="draft",
                 data_source=data_source, started_at=sp.started_at, created_by=actor.user_id,
-                tech_tags=["demo-data"] if data_source != "user" else [])
+                tech_tags=[], is_archive=data_source != "user")
     db.add(p)
     db.flush()
     doc = Document(project_id=p.id, filename="brief.md", mime="text/markdown", extracted_text=sp.brief,

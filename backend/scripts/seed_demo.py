@@ -9,12 +9,13 @@ from app.datasets import mendeley, synthetic  # noqa: E402
 from app.datasets.loader import load_project  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.services.learning import propose_lessons, recompute  # noqa: E402
-from app.services.reference import ensure_reference_data  # noqa: E402
+from app.services.reference import ensure_archive_users, ensure_reference_data  # noqa: E402
 
 
 def main() -> None:
     with SessionLocal() as db:
         ensure_reference_data(db)
+        ensure_archive_users(db)
         n_new = 0
         for sp in synthetic.generate():
             if load_project(db, sp, "synthetic"):

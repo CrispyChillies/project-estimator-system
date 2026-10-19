@@ -1,13 +1,13 @@
 /**
- * Browser E2E against a backend running in LLM_MODE=replay (no live LLM cost) and a seeded DB.
- *   cd backend && LLM_MODE=replay uvicorn app.main:app --port 8000
- *   cd frontend && pnpm dev   # then: pnpm exec playwright test
+ * Browser E2E on an isolated stack (see e2e/run.sh): fake LLM, separate database, signed in as the admin who holds
+ * the archived data.   make e2e
  */
-import { expect, request, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-const API = process.env.E2E_API_URL ?? "http://localhost:8000/api/v1";
+import { ADMIN, apiCall, signIn } from "./helpers";
+
 const SHOTS = path.resolve(__dirname, "../../docs/screenshots");
 const BRIEF = path.resolve(__dirname, "../../data/fixtures/demo_brief_2.md");
 
@@ -20,21 +20,22 @@ const shot = (name: string) => page.screenshot({ path: path.join(SHOTS, `${name}
 
 test.beforeAll(async ({ browser }) => {
   fs.mkdirSync(SHOTS, { recursive: true });
-  const api = await request.newContext();
+  page = await browser.newPage();
+  await signIn(page, ADMIN.email, ADMIN.password);
   const p = await (
-    await api.post(`${API}/projects`, { data: { name: `FreshRoute dispatch (E2E ${Date.now()})`, client_name: "FreshRoute" } })
+    await apiCall(page, "POST", "/projects", { name: `FreshRoute dispatch (E2E ${Date.now()})`, client_name: "FreshRoute" })
   ).json();
   projectId = p.id;
-  const up = await api.post(`${API}/projects/${projectId}/documents`, {
-    multipart: { file: { name: "demo_brief_2.md", mimeType: "text/markdown", buffer: fs.readFileSync(BRIEF) } },
+  const up = await apiCall(page, "POST", `/projects/${projectId}/documents`, undefined, {
+    file: { name: "brief.md", mimeType: "text/markdown", buffer: fs.readFileSync(BRIEF) },
   });
   expect(up.status()).toBe(201);
-  page = await browser.newPage();
 });
 
-test("projects list shows seeded history with data badges", async () => {
+test("projects list shows the admin's archived projects like normal data", async () => {
   await page.goto("/projects");
-  await expect(page.getByText("Synthetic").first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /FreshRoute dispatch/ }).first()).toBeVisible();
+  await expect(page.getByText(/^(Synthetic|Demo data)$/)).toHaveCount(0);
   await shot("projects");
 });
 
@@ -138,27 +139,25 @@ test("actuals: inline edits, invalid CSV, unplanned work, mark delivered", async
   await shot("actuals");
 });
 
-test("settings: rate card, hyperparameter, reset dialog, LLM usage", async () => {
+test("settings has no model controls; admin page holds learning, usage and archive", async () => {
   await page.goto("/settings");
-  const rate = page.locator("table").first().getByRole("textbox").first();
+  const rate = page.getByRole("textbox", { name: /Hourly rate for/ }).first();
   await expect(rate).not.toHaveValue("");
   await rate.fill(String(Number(await rate.inputValue()) + 1));
   await rate.blur();
   await expect(page.getByText(/rate saved/)).toBeVisible();
+  await expect(page.getByText(/LLM|model|Hyperparameters|Reset learned data/i)).toHaveCount(0);
+  await shot("settings");
+  await page.goto("/admin");
+  await page.getByRole("tab", { name: "Data archive" }).click();
+  await expect(page.getByText("Archived synthetic test data, kept for storage and reference.")).toBeVisible();
+  await page.getByRole("tab", { name: "Learning" }).click();
   const wmax = page.locator("div", { has: page.locator("code", { hasText: /^w_max$/ }) }).getByRole("textbox").last();
   await wmax.fill("0.5");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Hyperparameters saved")).toBeVisible();
   await page.getByRole("button", { name: "Defaults" }).click();
-  await page.getByRole("button", { name: "Reset learned data" }).click();
-  await expect(page.getByRole("alertdialog")).toBeVisible();
-  await page.getByRole("button", { name: "Cancel" }).click();
-  await expect(page.getByRole("alertdialog")).toBeHidden();
-  await expect(page.getByText(/mode: (replay|live|record|fake)/)).toBeVisible();
-  await expect(page.getByText(/Live spend, all time/)).toBeVisible();
-  await expect(page.getByText("Retrieval (similar past projects)")).toBeVisible();
   await expect(page.getByRole("textbox", { name: "retrieval_k" })).toHaveValue("3");
-  await shot("settings");
 });
 
 test("insights and backtest render", async () => {

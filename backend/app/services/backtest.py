@@ -234,7 +234,8 @@ def eligible_records(db: Session, data_source: str | None = None) -> list[Projec
     return [r for r in recs if r.data_source in sources and r.delivered and eval_tasks(r)]
 
 
-def run_backtest(db: Session, config: dict, progress: Callable[[float, str], None] | None = None) -> BacktestRun:
+def run_backtest(db: Session, config: dict, progress: Callable[[float, str], None] | None = None,
+                 owner_id: uuid.UUID | None = None) -> BacktestRun:
     from app.services.learning import active_model_key
 
     p = get_params(db)
@@ -242,10 +243,17 @@ def run_backtest(db: Session, config: dict, progress: Callable[[float, str], Non
     # Never pool synthetic and real dataset projects.
     source = config.get("data_source") or "synthetic"
     run = BacktestRun(config={"protocol": protocol, "params": p.model_dump(), "model_key": active_model_key(),
-                              "data_source": source}, status="running")
+                              "data_source": source}, status="running", owner_id=owner_id)
     db.add(run)
     db.flush()
-    recs = eligible_records(db, source)
+    from app.core.access import pool_project_ids
+
+    pool = pool_project_ids(db, owner_id)
+    if pool is None:
+        recs = eligible_records(db, source)
+    else:  # members backtest only their own pool (any source, never mixed with the archive unless enabled)
+        loaded = load_records(db, pool, with_embeddings=True, with_raw_samples=True) if pool else []
+        recs = [r for r in loaded if r.delivered and eval_tasks(r)]
     if progress:
         progress(0.05, f"{len(recs)} eligible projects")
     out = run_backtest_core(recs, p, protocol, progress)

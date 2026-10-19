@@ -3,7 +3,8 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { DataSourceBadge, ErrorState, StatusBadge } from "@/components/common";
+import { ErrorState, StatusBadge } from "@/components/common";
+import { ShareDialog } from "@/components/project/share-dialog";
 import { ActivityTab } from "@/components/project/activity-tab";
 import { ActualsTab } from "@/components/project/actuals-tab";
 import { EstimateTab } from "@/components/estimate/estimate-tab";
@@ -37,8 +38,12 @@ export default function ProjectPage() {
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold tracking-tight">{project.name}</h1>
         <StatusBadge status={project.status} />
-        <DataSourceBadge source={project.data_source} />
         {project.client_name && <span className="text-sm text-muted-foreground">· {project.client_name}</span>}
+        {project.access === "owner" && !project.is_archive && (
+          <div className="ml-auto">
+            <ShareDialog project={project} />
+          </div>
+        )}
       </div>
       <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
         <TabsList>

@@ -204,7 +204,10 @@ def structural_signals(recs: list[ProjectRec]) -> dict:
     }
 
 
-def load_stats(db: Session) -> tuple[StatsMap, StatsMap]:
+def load_stats(db: Session, pool: list[uuid.UUID] | None = None) -> tuple[StatsMap, StatsMap]:
+    """Calibration stats for a learning pool. None = the full (admin) pool, read from calibration_stats."""
+    if pool is not None:
+        return stats_from_records(load_records(db, pool) if pool else [], get_params(db))
     edit: StatsMap = {}
     actual: StatsMap = {}
     for s in db.scalars(select(CalibrationStat)):
@@ -272,6 +275,9 @@ def ensure_calibration_for_active_model(db: Session) -> bool:
     row = db.get(Setting, "calibration_model_key")
     if row is not None and row.value == active_model_key():
         return False
+    if row is not None and not latest_final_estimates(db, model_key=active_model_key()):
+        # No history for this model yet: keep the stored stats instead of replacing them with empty ones.
+        return False
     recompute(db, "manual")
     db.commit()
     log.info("calibration recomputed for model_key", extra={"extra": {"model_key": active_model_key()}})
@@ -290,12 +296,14 @@ def finalize_estimate(db: Session, estimate_id: uuid.UUID, user_id: uuid.UUID | 
         project.status = "quoted"
     db.flush()
     recompute(db, "estimate_finalized", project_id=est.project_id, layers=("edit",))
+    _member_snapshot(db, user_id, "estimate_finalized", est.project_id, ("edit",))
     if run_lessons:
-        propose_lessons(db)
+        _lessons_for(db, user_id)
     return est
 
 
-def deliver_project(db: Session, project_id: uuid.UUID, *, run_lessons: bool = True) -> Project:
+def deliver_project(db: Session, project_id: uuid.UUID, *, run_lessons: bool = True,
+                    user_id: uuid.UUID | None = None) -> Project:
     from app.core.errors import AppError, NotFound
 
     project = db.get(Project, project_id)
@@ -307,16 +315,42 @@ def deliver_project(db: Session, project_id: uuid.UUID, *, run_lessons: bool = T
     project.delivered_at = project.delivered_at or datetime.now(UTC)
     db.flush()
     recompute(db, "project_delivered", project_id=project_id, layers=("actual",))
+    _member_snapshot(db, user_id, "project_delivered", project_id, ("actual",))
     if run_lessons:
-        propose_lessons(db)
+        _lessons_for(db, user_id)
     return project
 
 
+def _member_snapshot(db: Session, user_id: uuid.UUID | None, trigger: str, project_id: uuid.UUID,
+                     layers: tuple[str, ...]) -> None:
+    """Members get their own calibration history computed only from their pool."""
+    from app.core.access import pool_project_ids
+
+    pool = pool_project_ids(db, user_id)
+    if pool is None:
+        return
+    recs = load_records(db, pool) if pool else []
+    edit, actual = stats_from_records(recs, get_params(db))
+    for layer, stats in (("edit", edit), ("actual", actual)):
+        if layer in layers:
+            db.add(CalibrationRun(trigger=trigger, layer=layer, project_id=project_id, owner_id=user_id,
+                                  stats_snapshot={"stats": _snapshot(stats), "n_projects": len(recs),
+                                                  "model_key": active_model_key()}))
+    db.flush()
+
+
+def _lessons_for(db: Session, user_id: uuid.UUID | None) -> None:
+    from app.core.access import pool_project_ids
+
+    propose_lessons(db, pool_project_ids(db, user_id), owner_id=user_id)
+
+
 # ---------------- lessons ----------------
-def lesson_evidence(db: Session) -> tuple[list[dict], dict[str, list[uuid.UUID]]]:
+def lesson_evidence(db: Session, pool: list[uuid.UUID] | None = None
+                    ) -> tuple[list[dict], dict[str, list[uuid.UUID]]]:
     from app.agents.templates import CATEGORY_NAMES
 
-    recs = load_records(db)
+    recs = load_records(db, pool) if pool is None or pool else []
     evidence: list[dict] = []
     event_ids: dict[str, list[uuid.UUID]] = {}
     task_cat = {t.task_id: t.category for r in recs for t in r.tasks}
@@ -354,10 +388,11 @@ def lesson_evidence(db: Session) -> tuple[list[dict], dict[str, list[uuid.UUID]]
     return evidence[:40], event_ids
 
 
-def propose_lessons(db: Session) -> list[LearnedRule]:
+def propose_lessons(db: Session, pool: list[uuid.UUID] | None = None,
+                    owner_id: uuid.UUID | None = None) -> list[LearnedRule]:
     from app.agents.chains import run_lessons
 
-    evidence, event_ids = lesson_evidence(db)
+    evidence, event_ids = lesson_evidence(db, pool)
     if not evidence:
         return []
     try:
@@ -365,9 +400,10 @@ def propose_lessons(db: Session) -> list[LearnedRule]:
     except Exception:
         log.exception("lessons chain failed")
         return []
-    existing = {(r.layer, (r.scope or {}).get("category_key"), r.text) for r in db.scalars(select(LearnedRule))}
+    mine = _rules_q(owner_id)
+    existing = {(r.layer, (r.scope or {}).get("category_key"), r.text) for r in db.scalars(mine)}
     active_scopes = {(r.layer, (r.scope or {}).get("category_key")) for r in db.scalars(
-        select(LearnedRule).where(LearnedRule.status != "proposed"))}
+        mine.where(LearnedRule.status != "proposed"))}
     # Replace stale proposals for the same scope; never touch active/disabled rules.
     new_rules = []
     for lesson in result.rules:
@@ -375,18 +411,26 @@ def propose_lessons(db: Session) -> list[LearnedRule]:
         if (lesson.layer, lesson.category_key, lesson.text) in existing or scope_key in active_scopes:
             continue
         db.execute(delete(LearnedRule).where(LearnedRule.status == "proposed", LearnedRule.layer == lesson.layer,
+                                             LearnedRule.owner_id == owner_id if owner_id else LearnedRule.owner_id.is_(None),
                                              LearnedRule.scope["category_key"].astext == (lesson.category_key or "")))
         ids = event_ids.get(f"{lesson.layer}:{lesson.category_key}") or event_ids.get(
             f"edit:{lesson.category_key}:missing", [])
         rule = LearnedRule(text=lesson.text[:500], layer=lesson.layer, scope={"category_key": lesson.category_key},
-                           evidence_event_ids=ids, evidence_count=lesson.evidence_count, status="proposed")
+                           evidence_event_ids=ids, evidence_count=lesson.evidence_count, status="proposed",
+                           owner_id=owner_id)
         db.add(rule)
         new_rules.append(rule)
     db.flush()
     return new_rules
 
 
-def active_rules(db: Session) -> list[LearnedRule]:
+def _rules_q(owner_id: uuid.UUID | None):
+    q = select(LearnedRule)
+    return q.where(LearnedRule.owner_id == owner_id) if owner_id else q
+
+
+def active_rules(db: Session, owner_id: uuid.UUID | None = None) -> list[LearnedRule]:
+    """Rules are per owner: a member only ever gets rules learned from their own pool."""
     p = get_params(db)
-    return list(db.scalars(select(LearnedRule).where(LearnedRule.status == "active")
+    return list(db.scalars(_rules_q(owner_id).where(LearnedRule.status == "active")
                            .order_by(LearnedRule.evidence_count.desc()).limit(p.max_active_rules)))
