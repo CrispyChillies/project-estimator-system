@@ -131,6 +131,17 @@ export function EstimateTab({
     });
   }, []);
   const [agentHl, setAgentHl] = useState<Highlight>({});
+  const [selection, setSelection] = useState<Set<string>>(new Set());
+  const toggleSelect = useCallback(
+    (id: string) =>
+      setSelection((s) => {
+        const n = new Set(s);
+        if (n.has(id)) n.delete(id);
+        else n.add(id);
+        return n;
+      }),
+    [],
+  );
   const hlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flash = useCallback((ids: string[]) => {
     if (!ids.length) return;
@@ -344,6 +355,8 @@ export function EstimateTab({
             highlight={highlight}
             showRemoved={showRemoved}
             onWhy={setWhy}
+            selection={agent ? selection : undefined}
+            onToggleSelect={agent && !readOnly ? toggleSelect : undefined}
           />
         )}
       </div>
@@ -368,6 +381,8 @@ export function EstimateTab({
               onClose={() => setAgent(false)}
               onPatch={flash}
               onShowTasks={showTasks}
+              selectedIds={[...selection]}
+              onClearSelection={() => setSelection(new Set())}
             />
           </ResizablePanel>
         </ResizablePanelGroup>

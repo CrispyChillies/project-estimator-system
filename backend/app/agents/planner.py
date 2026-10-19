@@ -73,8 +73,19 @@ def plan(kit: Toolkit, text: str) -> Plan:
         yield
         return "\n".join(x for x in out if x)
 
+    sel = kit.ctx.selection
     for clause in [c.strip() for c in re.split(r"\s*(?:;|\n|\bthen\b)\s*", low) if c.strip()]:
-        if m := re.search(r"\bfit\b(?: the)?(?: (.+?))? to " + NUM + r"\s*(?:h\b|hours?)?", clause):
+        refers_sel = bool(sel) and re.search(r"\b(these|selected|selection|them|those)\b", clause)
+        if refers_sel and (m := re.search(NUM + r"\s*%", clause)):
+            down = re.search(r"short|small|less|reduc|cut|decreas|lower|trim", clause)
+            call("bulk_adjust", tasks=sel, percent=float(m.group(1)) * (-1 if down else 1))
+        elif refers_sel and re.search(r"\b(hide|exclude)\b", clause):
+            call("toggle_visibility", tasks=sel, visible=False)
+        elif refers_sel and re.search(r"\b(delete|remove|drop)\b", clause):
+            call("delete_tasks", tasks=sel)
+        elif refers_sel and re.search(r"\bround\b", clause):
+            call("bulk_adjust", tasks=sel, percent=0, round_to=0.5)
+        elif m := re.search(r"\bfit\b(?: the)?(?: (.+?))? to " + NUM + r"\s*(?:h\b|hours?)?", clause):
             scope = (m.group(1) or "").strip()
             group = None if not scope or re.search(r"whole|estimate|everything|all|total", scope) else scope
             call("fit_to_budget", target_hours=float(m.group(2)), group=group)

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.agents.runtime import acquire_lock, check_user_can_run, stream_run
+from app.agents.runtime import acquire_lock, check_user_can_run, run_in_background, stream_run
 from app.api.deps import current_user_id
 from app.core.errors import AppError, NotFound
 from app.core.usage import AIRateLimit
@@ -40,6 +40,7 @@ class SessionPatch(BaseModel):
 class RunIn(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
     idempotency_key: str | None = Field(None, max_length=80)
+    selected_task_ids: list[str] = Field(default_factory=list, max_length=200)
 
 
 class MemoryIn(BaseModel):
@@ -85,8 +86,9 @@ def _event(db: Session, s: AgentSession, text: str, payload: dict) -> None:
 
 # ---------- sessions ----------
 @router.get("/estimates/{estimate_id}/agent/sessions")
-def list_sessions(estimate_id: uuid.UUID, db: Session = Depends(get_db)) -> list[dict]:
-    q = (select(AgentSession).where(AgentSession.estimate_id == estimate_id, AgentSession.status != "deleted",
+def list_sessions(estimate_id: uuid.UUID, include_archived: bool = False, db: Session = Depends(get_db)) -> list[dict]:
+    statuses = ("active", "archived") if include_archived else ("active",)
+    q = (select(AgentSession).where(AgentSession.estimate_id == estimate_id, AgentSession.status.in_(statuses),
                                     AgentSession.mode == "chat")
          .order_by(AgentSession.pinned.desc(), AgentSession.last_activity_at.desc().nulls_last(),
                    AgentSession.created_at.desc()))
@@ -142,8 +144,27 @@ def start_run(session_id: uuid.UUID, body: RunIn, db: Session = Depends(get_db),
     es.ensure_draft(db, s.estimate_id)
     check_user_can_run(db, uid)
     acquire_lock(db, s.id)
-    return StreamingResponse(stream_run(s.id, body.text, uid, body.idempotency_key), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    return StreamingResponse(stream_run(s.id, body.text, uid, body.idempotency_key, selection=body.selected_task_ids),
+                             media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no",
+                                      "Connection": "keep-alive"})
+
+
+@router.post("/agent/sessions/{session_id}/runs/async", status_code=202, dependencies=[AIRateLimit])
+def start_run_async(session_id: uuid.UUID, body: RunIn, db: Session = Depends(get_db), uid=Depends(current_user_id)):
+    """Polling fallback for networks that buffer or block event streams: start the run, then poll
+    `/agent/sessions/{id}` (run_state) and `/messages` until it is idle."""
+    s = _session(db, session_id)
+    es.ensure_draft(db, s.estimate_id)
+    check_user_can_run(db, uid)
+    acquire_lock(db, s.id)
+    run_in_background(s.id, body.text, uid, body.idempotency_key, body.selected_task_ids)
+    return {"session_id": str(s.id), "run_state": "running"}
+
+
+@router.get("/agent/sessions/{session_id}")
+def get_session(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+    return _session_out(_session(db, session_id))
 
 
 @router.post("/agent/sessions/{session_id}/cancel", status_code=202)

@@ -28,7 +28,7 @@ class SignupIn(BaseModel):
 
 
 class LoginIn(BaseModel):
-    email: EmailStr
+    email: str = Field(min_length=3, max_length=200)
     password: str = Field(min_length=1, max_length=200)
 
 

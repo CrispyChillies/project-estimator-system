@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
@@ -218,6 +219,7 @@ class RunContext:
         self.applied: list[str] = []
         self.tool_log: list[dict] = []
         self.ask: dict | None = None
+        self.selection: list[str] = []
         self.references: list[dict] | None = None
         self.ex = OperationExecutor(db, self.estimate_id, user_id=user_id, session_id=session.id)
         self.s = get_settings()
@@ -245,6 +247,7 @@ class Toolkit:
         ctx._call_seq += 1
         cid = call_id or f"call_{ctx._call_seq}"
         spec = TOOL_SPECS.get(name)
+        t0 = time.monotonic()
         ctx.emit("tool_call_started", {"id": cid, "name": name, "args": args or {}})
         if spec is None:
             res = {"ok": False, "error": "unknown_tool", "message": f"Unknown tool {name}"}
@@ -259,11 +262,12 @@ class Toolkit:
                 res = {"ok": False, "error": "invalid_args", "message": str(e.errors()[:3])}
             except AppError as e:
                 res = {"ok": False, "error": e.code, "message": e.message}
+        ms = int((time.monotonic() - t0) * 1000)
         ctx.emit("tool_call_result", {"id": cid, "name": name, **{k: v for k, v in res.items() if k != "data"},
-                                      "data": res.get("data")})
+                                      "data": res.get("data"), "duration_ms": ms})
         ctx.tool_log.append({"id": cid, "name": name, "ok": res["ok"], "status": res.get("status"),
                              "summary": res.get("summary") or res.get("message"),
-                             "operation_id": res.get("operation_id")})
+                             "operation_id": res.get("operation_id"), "args": args or {}, "duration_ms": ms})
         return res
 
     # ---------- resolution ----------
@@ -332,6 +336,11 @@ class Toolkit:
         if not key:
             return None
         _, k2id = category_maps(self.db)
+        if key not in k2id:  # accept the human name too ("Authentication" -> auth)
+            from app.db.models import TaskCategory as TC
+
+            by_name = {c.name.lower(): c.key for c in self.db.scalars(select(TC))}
+            key = by_name.get(key.strip().lower(), key.strip().lower().replace(" ", "_"))
         if key not in k2id:
             raise AppError("category_not_found", f"Unknown category '{key}'. Categories: {', '.join(sorted(k2id))}",
                            404)
@@ -476,7 +485,8 @@ class Toolkit:
         return {"summary": f"{len(analogs)} similar task(s)", "data": [x.to_dict() for x in analogs]}
 
     def explain_task(self, a: TaskRef, cid: str) -> dict:
-        t = self.task(a.task)
+        t = self.task(re.sub(r"\s+(task|so high|so low|so big|so expensive|so large|so small)\b.*$", "", a.task.strip(),
+                             flags=re.I) or a.task)
         b = self.db.scalar(select(TaskAIBaseline).where(TaskAIBaseline.task_id == t.id))
         if not b:
             return {"summary": f"'{t.title}' was added manually ({t.min_hours:g}–{t.max_hours:g} h); no AI provenance."}

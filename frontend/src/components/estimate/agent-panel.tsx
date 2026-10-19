@@ -2,6 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  Archive,
   Bot,
   Brain,
   Check,
@@ -45,7 +46,7 @@ import {
   usePatchSession,
 } from "@/hooks/agent";
 import { errorToast, useDocuments, useInvalidateEstimate } from "@/hooks/queries";
-import { api, postSSE } from "@/lib/api";
+import { api, ApiError, postSSE } from "@/lib/api";
 import type { AgentMsg, AgentOperationOut, ReferenceProject, ToolLogEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -95,7 +96,7 @@ const TOOL_LABEL: Record<string, string> = {
 
 type Live =
   | { kind: "user"; text: string }
-  | { kind: "tool"; id: string; name: string; result?: LiveResult }
+  | { kind: "tool"; id: string; name: string; args?: Record<string, unknown>; result?: LiveResult }
   | { kind: "ask"; question: string; options: string[] }
   | { kind: "refs"; items: ReferenceProject[] }
   | { kind: "text"; text: string };
@@ -109,7 +110,18 @@ interface LiveResult {
   before?: [number, number];
   after?: [number, number];
   reasons?: string[];
+  duration_ms?: number;
 }
+
+function argsSummary(args?: Record<string, unknown>): string {
+  if (!args) return "";
+  return Object.entries(args)
+    .filter(([, v]) => v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0))
+    .map(([k, v]) => `${k.replaceAll("_", " ")}: ${Array.isArray(v) ? `${v.length} item(s)` : typeof v === "object" ? "…" : String(v)}`)
+    .join(" · ");
+}
+
+const POLL_ONLY = process.env.NEXT_PUBLIC_CHAT_TRANSPORT === "poll";
 
 const range = (r?: [number, number]) => (r ? `${r[0]}–${r[1]} h` : "");
 
@@ -120,12 +132,14 @@ function sessionKey(estimateId: string) {
 function ToolCard({
   name,
   entry,
+  args,
   op,
   busy,
   onAct,
   onShow,
 }: {
   name: string;
+  args?: Record<string, unknown>;
   entry?: LiveResult | ToolLogEntry;
   op?: AgentOperationOut;
   busy: boolean;
@@ -141,6 +155,9 @@ function ToolCard({
   const text = entry?.summary ?? live?.message;
   const opId = op?.id ?? live?.operation_id;
   const undo = op?.result.undo;
+  const [raw, setRaw] = useState(false);
+  const callArgs = args ?? (entry as ToolLogEntry | undefined)?.args;
+  const ms = (entry as LiveResult | undefined)?.duration_ms;
   return (
     <div
       className={cn(
@@ -153,10 +170,20 @@ function ToolCard({
       <div className="flex items-center gap-1.5">
         {!entry ? <Loader2 className="size-3.5 animate-spin" /> : <Wrench className="size-3.5 text-muted-foreground" />}
         <span className="font-medium">{TOOL_LABEL[name] ?? name}</span>
-        <Badge variant="outline" className="ml-auto h-4 px-1.5 text-[10px]">
+        {ms !== undefined && <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">{ms} ms</span>}
+        <Badge variant="outline" className={cn("h-4 px-1.5 text-[10px]", ms === undefined && "ml-auto")}>
           {status.replaceAll("_", " ")}
         </Badge>
       </div>
+      {callArgs && Object.keys(callArgs).length > 0 && (
+        <div className="mt-0.5 text-muted-foreground">
+          {argsSummary(callArgs)}{" "}
+          <button type="button" className="underline underline-offset-2" onClick={() => setRaw((r) => !r)} aria-expanded={raw}>
+            {raw ? "hide JSON" : "JSON"}
+          </button>
+          {raw && <pre className="mt-1 max-h-40 overflow-auto rounded bg-muted p-1.5 text-[10px]">{JSON.stringify(callArgs, null, 2)}</pre>}
+        </div>
+      )}
       {text && <div className={cn("mt-1", entry && !entry.ok && "text-rose-600")}>{text}</div>}
       {before && after && (
         <div className="mt-1 tabular-nums text-muted-foreground">
@@ -272,11 +299,15 @@ export function AgentPanel({
   onClose,
   onPatch,
   onShowTasks,
+  selectedIds = [],
+  onClearSelection,
 }: {
   estimateId: string;
   projectId: string;
   readOnly: boolean;
   onClose: () => void;
+  selectedIds?: string[];
+  onClearSelection?: () => void;
 } & PatchHandlers) {
   const qc = useQueryClient();
   const invalidate = useInvalidateEstimate();
@@ -292,6 +323,7 @@ export function AgentPanel({
   const [acting, setActing] = useState(false);
   const [text, setText] = useState("");
   const [memOpen, setMemOpen] = useState(false);
+  const [failure, setFailure] = useState<{ text: string; message: string } | null>(null);
   const remoteRunning = session?.run_state === "running" && !busy;
   const { data: messages } = useAgentMessages(sessionId, remoteRunning);
   const { data: ops } = useAgentOps(sessionId);
@@ -337,6 +369,18 @@ export function AgentPanel({
     setLive([]);
   };
 
+  const waitUntilIdle = async (sid: string) => {
+    // Polling transport and stream recovery: the run continues on the server, the state is persisted.
+    for (let i = 0; i < 400; i++) {
+      const s = await api<{ run_state: string }>(`/agent/sessions/${sid}`).catch(() => null);
+      await qc.refetchQueries({ queryKey: ak.messages(sid) });
+      await qc.refetchQueries({ queryKey: ak.ops(sid) });
+      invalidate(estimateId);
+      if (s && s.run_state !== "running" && s.run_state !== "cancelling") return;
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  };
+
   const send = async (raw: string) => {
     const t = raw.trim();
     if (!t || busy || readOnly) return;
@@ -348,53 +392,69 @@ export function AgentPanel({
     if (!sessionId) return;
     setText("");
     setBusy(true);
+    setFailure(null);
     setLive([{ kind: "user", text: t }]);
     const push = (item: Live) => setLive((l) => [...l, item]);
+    const body = { text: t, idempotency_key: crypto.randomUUID(), selected_task_ids: selectedIds };
+    let gotEvent = false;
+    let failed: string | null = null;
+    const onEvent = (ev: string, data: unknown) => {
+      gotEvent = true;
+      const d = data as Record<string, unknown>;
+      if (ev === "tool_call_started") push({ kind: "tool", id: String(d.id), name: String(d.name), args: d.args as Record<string, unknown> });
+      if (ev === "tool_call_result")
+        setLive((l) => l.map((x) => (x.kind === "tool" && x.id === d.id ? { ...x, result: d as unknown as LiveResult } : x)));
+      if (ev === "confirmation_required") {
+        const opId = String(d.operation_id);
+        setLive((l) =>
+          l.map((x) =>
+            x.kind === "tool" && x.result?.operation_id === opId ? { ...x, result: { ...x.result, reasons: d.reasons as string[] } } : x,
+          ),
+        );
+      }
+      if (ev === "table_patch") {
+        onPatch([...((d.task_ids as string[]) ?? []), ...((d.created_ids as string[]) ?? [])]);
+        invalidate(estimateId);
+        void qc.invalidateQueries({ queryKey: ak.ops(sessionId) });
+      }
+      if (ev === "ask_user") push({ kind: "ask", question: String(d.question), options: (d.options as string[]) ?? [] });
+      if (ev === "references") push({ kind: "refs", items: (d.items as ReferenceProject[]) ?? [] });
+      if (ev === "memory_updated") void qc.invalidateQueries({ queryKey: ak.memories(estimateId) });
+      if (ev === "message_delta")
+        setLive((l) => {
+          const last = l[l.length - 1];
+          if (last?.kind === "text") return [...l.slice(0, -1), { kind: "text", text: last.text + String(d.text) }];
+          return [...l, { kind: "text", text: String(d.text) }];
+        });
+      if (ev === "error") failed = String(d.message);
+    };
     try {
-      await postSSE(
-        `/agent/sessions/${sessionId}/runs`,
-        { text: t, idempotency_key: crypto.randomUUID() },
-        {
-          onEvent: (ev, data) => {
-            const d = data as Record<string, unknown>;
-            if (ev === "tool_call_started") push({ kind: "tool", id: String(d.id), name: String(d.name) });
-            if (ev === "tool_call_result")
-              setLive((l) => l.map((x) => (x.kind === "tool" && x.id === d.id ? { ...x, result: d as unknown as LiveResult } : x)));
-            if (ev === "confirmation_required") {
-              const opId = String(d.operation_id);
-              setLive((l) =>
-                l.map((x) =>
-                  x.kind === "tool" && x.result?.operation_id === opId
-                    ? { ...x, result: { ...x.result, reasons: d.reasons as string[] } }
-                    : x,
-                ),
-              );
-            }
-            if (ev === "table_patch") {
-              onPatch([...((d.task_ids as string[]) ?? []), ...((d.created_ids as string[]) ?? [])]);
-              invalidate(estimateId);
-              void qc.invalidateQueries({ queryKey: ak.ops(sessionId) });
-            }
-            if (ev === "ask_user") push({ kind: "ask", question: String(d.question), options: (d.options as string[]) ?? [] });
-            if (ev === "references") push({ kind: "refs", items: (d.items as ReferenceProject[]) ?? [] });
-            if (ev === "memory_updated") void qc.invalidateQueries({ queryKey: ak.memories(estimateId) });
-            if (ev === "message_delta")
-              setLive((l) => {
-                const last = l[l.length - 1];
-                if (last?.kind === "text") return [...l.slice(0, -1), { kind: "text", text: last.text + String(d.text) }];
-                return [...l, { kind: "text", text: String(d.text) }];
-              });
-            if (ev === "error") toast.error(String(d.message));
-          },
-        },
-      );
+      if (POLL_ONLY) throw new Error("poll");
+      const ctrl = new AbortController();
+      // A proxy that buffers the stream shows nothing; after 20 s without any event, switch to polling.
+      const watchdog = setTimeout(() => !gotEvent && ctrl.abort(), 20_000);
+      try {
+        await postSSE(`/agent/sessions/${sessionId}/runs`, body, { onEvent, signal: ctrl.signal });
+      } finally {
+        clearTimeout(watchdog);
+      }
     } catch (e) {
-      errorToast(e);
+      if (e instanceof ApiError && e.status !== 0 && e.code !== "stream_error") {
+        failed = e.message; // a real refusal (allowance, rate limit, run in progress, ...): show it, never retry silently
+      } else if (!gotEvent) {
+        try {
+          await api(`/agent/sessions/${sessionId}/runs/async`, { method: "POST", json: body });
+        } catch (err) {
+          if (!(err instanceof ApiError && err.status === 409)) failed = err instanceof Error ? err.message : "The agent could not start.";
+        }
+      }
+      if (!failed) await waitUntilIdle(sessionId);
     } finally {
       await refreshAgent();
       setLive([]);
       setBusy(false);
       invalidate(estimateId);
+      if (failed) setFailure({ text: t, message: failed });
     }
   };
 
@@ -509,6 +569,14 @@ export function AgentPanel({
                     Rename…
                   </DropdownMenuItem>
                   <DropdownMenuItem
+                    onClick={() => {
+                      patch.mutate({ id: session.id, patch: { status: "archived" } });
+                      setPicked(null);
+                    }}
+                  >
+                    <Archive /> Archive
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
                     variant="destructive"
                     onClick={() => {
                       del.mutate(session.id);
@@ -545,6 +613,14 @@ export function AgentPanel({
         {budget !== undefined && <Badge variant="secondary">Budget {budget} h</Badge>}
         <Badge variant="secondary">{session?.use_memory === false ? "Memory off" : "Memory on"}</Badge>
         <Badge variant="secondary">k=3 refs</Badge>
+        {selectedIds.length > 0 && (
+          <Badge variant="default" className="gap-1" data-testid="selection-chip">
+            Selection ({selectedIds.length})
+            <button type="button" aria-label="Clear selection" onClick={onClearSelection} className="ml-0.5">
+              <X className="size-3" />
+            </button>
+          </Badge>
+        )}
       </div>
 
       <ScrollArea className="min-h-0 flex-1 rounded-md border">
@@ -590,6 +666,7 @@ export function AgentPanel({
               <ToolCard
                 key={i}
                 name={item.name}
+                args={item.args}
                 entry={item.result}
                 op={item.result?.operation_id ? opById.get(item.result.operation_id) : undefined}
                 busy
@@ -598,6 +675,20 @@ export function AgentPanel({
               />
             );
           })}
+          {failure && !busy && (
+            <div role="alert" className="rounded-lg border border-rose-500/50 bg-rose-500/5 p-2 text-xs">
+              <div className="font-medium text-rose-700 dark:text-rose-400">That did not work</div>
+              <div className="mt-0.5">{failure.message}</div>
+              <div className="mt-1.5 flex gap-1">
+                <Button size="xs" variant="outline" onClick={() => void send(failure.text)}>
+                  Retry
+                </Button>
+                <Button size="xs" variant="ghost" onClick={() => setFailure(null)}>
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          )}
           {(busy || remoteRunning) && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" /> {remoteRunning ? "Agent is still working…" : "Working…"}

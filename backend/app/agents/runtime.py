@@ -91,14 +91,62 @@ def _text(content: Any) -> str:
     return "".join(c.get("text", "") for c in content if isinstance(c, dict))
 
 
+HEARTBEAT_S = 15.0
+_DONE = object()
+
+
 def stream_run(session_id: uuid.UUID, text: str, user_id: uuid.UUID | None, idempotency_key: str | None = None,
-               *, model=None) -> Iterator[str]:
-    """Caller must hold the session lock (acquire_lock). Always releases it."""
+               *, model=None, selection: list[str] | None = None, heartbeat_s: float = HEARTBEAT_S) -> Iterator[str]:
+    """SSE stream for one run. The run executes in a worker thread so a heartbeat can be sent while the model is
+    thinking, and so a client disconnect never aborts it: everything is persisted, the client resumes from the DB.
+    Caller must hold the session lock (acquire_lock); it is always released."""
+    import contextvars
+    import queue
+    import threading
+
+    q: queue.Queue = queue.Queue()
+
+    def work() -> None:
+        try:
+            for item in _guarded(session_id, text, user_id, idempotency_key, model, selection):
+                q.put(item)
+        finally:
+            q.put(_DONE)
+
+    ctx = contextvars.copy_context()
+    threading.Thread(target=ctx.run, args=(work,), daemon=True, name=f"agent-run-{session_id}").start()
+    while True:
+        try:
+            item = q.get(timeout=heartbeat_s)
+        except queue.Empty:
+            yield sse("heartbeat", {"ts": datetime.now(UTC).isoformat()})
+            continue
+        if item is _DONE:
+            return
+        yield item
+
+
+def run_in_background(session_id: uuid.UUID, text: str, user_id: uuid.UUID | None,
+                      idempotency_key: str | None = None, selection: list[str] | None = None) -> None:
+    """Polling transport: same run, no stream; the client polls messages/operations until run_state is idle."""
+    import contextvars
+    import threading
+
+    ctx = contextvars.copy_context()
+
+    def work() -> None:
+        for _ in _guarded(session_id, text, user_id, idempotency_key, None, selection):
+            pass
+
+    threading.Thread(target=ctx.run, args=(work,), daemon=True, name=f"agent-bg-{session_id}").start()
+
+
+def _guarded(session_id: uuid.UUID, text: str, user_id, key, model, selection) -> Iterator[str]:
     from app.core.usage import use_llm_user
 
     try:
         with SessionLocal() as db, use_llm_user(user_id):
-            yield from _run(db, session_id, text, user_id, idempotency_key, model)
+            yield from _run(db, session_id, text, user_id, key, model, selection or [])
     except Exception as e:  # never leave the stream without a terminal event
         log.exception("agent run failed")
         yield sse("error", {"code": getattr(e, "code", "agent_error"),
@@ -108,7 +156,7 @@ def stream_run(session_id: uuid.UUID, text: str, user_id: uuid.UUID | None, idem
         _set_state(session_id, "idle")
 
 
-def _run(db: Session, session_id: uuid.UUID, text: str, user_id, key, model) -> Iterator[str]:
+def _run(db: Session, session_id: uuid.UUID, text: str, user_id, key, model, selection: list[str]) -> Iterator[str]:
     s = db.get(AgentSession, session_id)
     if key:
         prev = db.scalar(select(AgentMessage).where(AgentMessage.session_id == s.id,
@@ -124,7 +172,7 @@ def _run(db: Session, session_id: uuid.UUID, text: str, user_id, key, model) -> 
             return
     batch_id = uuid.uuid4()
     umsg = AgentMessage(id=uuid.uuid4(), session_id=s.id, role="user", content=text, idempotency_key=key,
-                        batch_id=batch_id)
+                        batch_id=batch_id, payload={"selection": selection} if selection else {})
     db.add(umsg)
     s.last_activity_at = datetime.now(UTC)
     if s.title in ("New session", "") and not text.startswith("/"):
@@ -136,6 +184,7 @@ def _run(db: Session, session_id: uuid.UUID, text: str, user_id, key, model) -> 
                               "message_id": str(umsg.id), "apply_mode": s.apply_mode})
 
     ctx = RunContext(db, s, user_id, batch_id, umsg.id)
+    ctx.selection = [t for t in selection if _task_in_estimate(db, t, s.estimate_id)]
     kit = Toolkit(ctx)
     gw = get_gateway()
     offline = model is None and (gw.mode in ("fake", "replay") or text.startswith("/"))
@@ -170,7 +219,14 @@ def _run(db: Session, session_id: uuid.UUID, text: str, user_id, key, model) -> 
 
         yield sse("stage", {"label": "Thinking"})
         agent = create_agent(model or gw.chat_model(), tools=_lc_tools(kit), system_prompt=memory.system_prompt(db, s))
-        msgs = memory.history_messages(db, s) + [{"role": "user", "content": text}]
+        note = ""
+        if ctx.selection:
+            from app.db.models import Task
+
+            titles = [f"{t.id} ({t.title})" for t in db.scalars(select(Task).where(Task.id.in_(
+                [uuid.UUID(x) for x in ctx.selection])))]
+            note = "\n\n[The user selected these rows; 'these'/'selected' refers to them: " + "; ".join(titles) + "]"
+        msgs = memory.history_messages(db, s) + [{"role": "user", "content": text + note}]
         steps = get_settings().agent_max_steps
         last_id = None
         try:
@@ -219,3 +275,13 @@ def _run(db: Session, session_id: uuid.UUID, text: str, user_id, key, model) -> 
     yield sse("cost_update", {"tokens": usage.tin + usage.tout, "cost_usd": round(usage.cost, 5),
                               "session_cost_usd": round(s.cost_usd, 5), "offline": offline})
     yield sse("run_done", {"status": ctx.paused or status, "batch_id": str(batch_id), "applied": len(ctx.applied)})
+
+
+def _task_in_estimate(db: Session, task_id: str, estimate_id: uuid.UUID) -> bool:
+    from app.db.models import Task
+
+    try:
+        t = db.get(Task, uuid.UUID(task_id))
+    except ValueError:
+        return False
+    return bool(t and t.estimate_id == estimate_id and not t.removed)

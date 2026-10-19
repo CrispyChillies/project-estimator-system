@@ -23,6 +23,7 @@ import { Fragment, useRef, useState } from "react";
 
 import { ReasonChips } from "@/components/estimate/reason-chips";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -84,6 +85,8 @@ function TaskRow({
   categories,
   highlight,
   onWhy,
+  selected,
+  onToggleSelect,
 }: {
   task: TaskOut;
   estimateId: string;
@@ -92,6 +95,8 @@ function TaskRow({
   categories: Category[];
   highlight?: Highlight[string];
   onWhy: (t: TaskOut) => void;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }) {
   const patch = usePatchTask(estimateId);
   const invalidate = useInvalidateEstimate();
@@ -141,12 +146,21 @@ function TaskRow({
           isDragging && "relative z-10 bg-background shadow",
         )}
       >
-        <TableCell className="w-6 pl-2">
-          {!readOnly && (
-            <button type="button" aria-label="Drag" className="cursor-grab text-muted-foreground" {...attributes} {...listeners}>
-              <GripVertical className="size-4" />
-            </button>
-          )}
+        <TableCell className="w-12 pl-2">
+          <div className="flex items-center gap-1">
+            {onToggleSelect && !task.removed && (
+              <Checkbox
+                checked={!!selected}
+                onCheckedChange={() => onToggleSelect(task.id)}
+                aria-label={`Select ${task.title}`}
+              />
+            )}
+            {!readOnly && (
+              <button type="button" aria-label="Drag" className="cursor-grab text-muted-foreground" {...attributes} {...listeners}>
+                <GripVertical className="size-4" />
+              </button>
+            )}
+          </div>
         </TableCell>
         <TableCell className="min-w-56 pl-6">
           <div className="flex items-center gap-1.5">
@@ -307,6 +321,8 @@ function ModuleRows({
   highlight: Highlight;
   showRemoved: boolean;
   onWhy: (t: TaskOut) => void;
+  selection?: Set<string>;
+  onToggleSelect?: (id: string) => void;
 }) {
   const [open, setOpen] = useState(true);
   const tasks = visibleTasks(module, rest.showRemoved);
@@ -334,7 +350,7 @@ function ModuleRows({
         {open &&
           ordered.map((t) => (
             <Fragment key={t.id}>
-              <TaskRow task={t} {...rest} highlight={rest.highlight[t.id]} />
+              <TaskRow task={t} {...rest} highlight={rest.highlight[t.id]} selected={rest.selection?.has(t.id)} />
             </Fragment>
           ))}
       </SortableContext>
@@ -352,6 +368,8 @@ export function EstimateTable({
   highlight,
   showRemoved,
   onWhy,
+  selection,
+  onToggleSelect,
 }: {
   tree: EstimateTree;
   roles: Role[];
@@ -359,6 +377,8 @@ export function EstimateTable({
   highlight: Highlight;
   showRemoved: boolean;
   onWhy: (t: TaskOut) => void;
+  selection?: Set<string>;
+  onToggleSelect?: (id: string) => void;
 }) {
   const readOnly = tree.estimate.status === "final";
   const estimateId = tree.estimate.id;
@@ -392,7 +412,7 @@ export function EstimateTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-6" />
+            <TableHead className="w-12"><span className="sr-only">Select and reorder</span></TableHead>
             <TableHead>Title</TableHead>
             <TableHead>Category</TableHead>
             <TableHead>Role</TableHead>
@@ -420,6 +440,8 @@ export function EstimateTable({
                 highlight={highlight}
                 showRemoved={showRemoved}
                 onWhy={onWhy}
+                selection={selection}
+                onToggleSelect={onToggleSelect}
               />
             ))}
         </TableBody>

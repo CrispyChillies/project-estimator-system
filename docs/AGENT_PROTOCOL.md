@@ -12,7 +12,8 @@ Base path `/api/v1`. Sessions belong to an estimate. One run per session at a ti
 | DELETE | `/agent/sessions/{sid}` | soft delete |
 | GET | `/agent/sessions/{sid}/messages` | roles `user, assistant, system_event` |
 | GET | `/agent/sessions/{sid}/operations` | all operations with status |
-| POST | `/agent/sessions/{sid}/runs` | `{text, idempotency_key?}` → SSE stream; **409** if a run is active |
+| POST | `/agent/sessions/{sid}/runs` | `{text, idempotency_key?, selected_task_ids?}` → SSE stream; **409** if a run is active |
+| POST | `/agent/sessions/{sid}/runs/async` | polling transport: same run without a stream; poll `GET /agent/sessions/{sid}` until `run_state` is `idle`, then read messages/operations |
 | POST | `/agent/sessions/{sid}/cancel` | stops the run at the next step boundary |
 | POST | `/agent/operations/{oid}/confirm` · `/reject` · `/undo` | confirm applies; undo may be partial |
 | POST | `/agent/batches/{batch_id}/undo` | "Undo all" for one turn |
@@ -22,6 +23,7 @@ Base path `/api/v1`. Sessions belong to an estimate. One run per session at a ti
 
 | Event | Data |
 |---|---|
+| `heartbeat` | `ts` — every 15 s while the model works (keeps proxies from closing the stream) |
 | `run_started` | `run_id, session_id, batch_id, message_id, apply_mode` (`duplicate: true` for a repeated idempotency key) |
 | `stage` | `label` |
 | `tool_call_started` | `id, name, args` |

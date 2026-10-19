@@ -1,0 +1,44 @@
+{
+ "firstCardMs": 2988,
+ "totalMs": 4792,
+ "changedRows": 6,
+ "network": [
+  {
+   "url": "/api/v1/agent/sessions/e0da3178-9775-4d39-9fa6-35767a699fc4/messages",
+   "status": 200,
+   "type": "application/json",
+   "ms": 28
+  },
+  {
+   "url": "/api/v1/agent/sessions/e0da3178-9775-4d39-9fa6-35767a699fc4/operations",
+   "status": 200,
+   "type": "application/json",
+   "ms": 27
+  },
+  {
+   "url": "/api/v1/agent/sessions/e0da3178-9775-4d39-9fa6-35767a699fc4/runs",
+   "status": 200,
+   "type": "text/event-stream; charset=utf-8",
+   "ms": 45
+  },
+  {
+   "url": "/api/v1/agent/sessions/e0da3178-9775-4d39-9fa6-35767a699fc4/operations",
+   "status": 200,
+   "type": "application/json",
+   "ms": 127
+  },
+  {
+   "url": "/api/v1/agent/sessions/e0da3178-9775-4d39-9fa6-35767a699fc4/messages",
+   "status": 200,
+   "type": "application/json",
+   "ms": 23
+  },
+  {
+   "url": "/api/v1/agent/sessions/e0da3178-9775-4d39-9fa6-35767a699fc4/operations",
+   "status": 200,
+   "type": "application/json",
+   "ms": 23
+  }
+ ],
+ "consoleErrors": []
+}

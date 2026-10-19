@@ -155,3 +155,9 @@ Short log of choices made where the brief was ambiguous or reality forced a devi
     recomputed deterministically from the preserved records, see DATA_INVENTORY.md).
 51. **Browser tests run on an isolated stack** (`frontend/e2e/run.sh`): a copy of the archive in `calibr_e2e`, fake
     LLM, a random admin password per run, separate Next build dir, so they never touch the dev data.
+52. **Agent runs execute in a worker thread** behind the SSE response: heartbeats every 15 s while the model thinks,
+    and a client disconnect never aborts a run (state is persisted; the panel resumes by polling `run_state`). The
+    same run can be started without a stream (`/runs/async`), which the panel uses automatically when the stream
+    cannot connect or shows no event within 20 s (`NEXT_PUBLIC_CHAT_TRANSPORT=poll` forces it).
+53. **Selection context**: checked table rows are sent as `selected_task_ids` (validated to the estimate); the planner
+    maps "these/selected" to them and the live model receives them as a note on the user message.

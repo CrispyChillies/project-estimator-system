@@ -26,7 +26,7 @@ with SessionLocal() as db:  # create/reset the e2e admin for this run (e2e datab
     db.commit()
 PY
 )
-(cd backend && DATABASE_URL="$E2E_DB" LLM_MODE=fake APP_ENV=test SIGNUP_MODE=open USER_HOURLY_REQUESTS=1000 \
+(cd backend && DATABASE_URL="$E2E_DB" LLM_MODE=${E2E_LLM_MODE:-fake} APP_ENV=test SIGNUP_MODE=open USER_HOURLY_REQUESTS=1000 \
   MAX_CONCURRENT_RUNS_PER_USER=5 ADMIN_EMAIL="$E2E_ADMIN_EMAIL" ADMIN_PASSWORD="$E2E_ADMIN_PASSWORD" \
   uv run uvicorn app.main:app --port 8010 >/tmp/calibr-e2e-backend.log 2>&1) &
 BACK=$!

@@ -154,6 +154,8 @@ export interface ToolLogEntry {
   status?: string | null;
   summary?: string | null;
   operation_id?: string | null;
+  args?: Record<string, unknown>;
+  duration_ms?: number;
 }
 
 export interface AgentMsg {
