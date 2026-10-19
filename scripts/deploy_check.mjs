@@ -63,7 +63,7 @@ async function main() {
   const cfg = await (await req("GET", "/api/v1/auth/config")).json().catch(() => ({}));
   const signup = await req("POST", "/api/v1/auth/signup", { body: { name: "Check", email: `check-${Date.now()}@example.com`, password: "a-long-password-123" } });
   const mode = cfg.signup_mode ?? cfg.mode ?? "?";
-  check(`sign-up rules (mode: ${mode})`, mode === "open" ? signup.status < 300 : signup.status >= 400, `HTTP ${signup.status}`);
+  check(`sign-up rules (mode: ${mode})`, mode === "?" ? false : mode === "open" ? signup.status < 300 : signup.status >= 400, `HTTP ${signup.status}`);
   const bad = await req("POST", "/api/v1/auth/login", { body: { email: "nobody@example.com", password: "wrong-password-123" } });
   check("bad login → generic 401", bad.status === 401, `HTTP ${bad.status}`);
 

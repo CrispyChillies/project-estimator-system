@@ -53,3 +53,14 @@ Incident (recovered): a test server started with `LLM_MODE=fake` against the dev
 `calibration_stats` for the fake model key (63 → 0 rows). These rows are derived data; they were recomputed from the
 preserved edit/actual records for the real model key (back to 63, check snapshot `check2`), and startup now refuses to
 replace stored stats with empty ones. No source data (projects, edits, actuals, documents) was affected.
+
+## End of Prompt 5 — `final` (dev database `calibr`)
+
+`python -m scripts.data_inventory compare pre-prompt5 final`: **no table lost rows.** Changes vs the backup
+snapshot: `users` 4 → 5 (the admin account), `calibration_runs` 60 → 64 (append-only recomputation log), new
+empty tables `sessions`, `login_attempts`, `password_resets`, `project_members`. All other tables are
+identical in count (projects 28, estimates 28, tasks 581, task_actuals 454, edit_events 377, backtest_results
+8988, llm_calls 159, …). Snapshot: `data/inventory/final.json`.
+
+The deployment copy of this data is `deploy/seed/admin_archive.sql.gz` (built from a scratch copy, password
+hashes removed, not committed) — see [DEPLOYMENT.md](DEPLOYMENT.md#the-admin-archive-your-existing-test-data).
