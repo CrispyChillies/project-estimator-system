@@ -19,6 +19,7 @@ export default function ProjectPage() {
   const { data: estimates } = useEstimates(id);
   const [tab, setTab] = useState("overview");
   const [estimateId, setEstimateId] = useState<string | null>(null);
+  const [agentRequest, setAgentRequest] = useState(0);
 
   useEffect(() => {
     if (!estimateId && estimates?.length) {
@@ -53,6 +54,7 @@ export default function ProjectPage() {
             onGenerated={(eid) => {
               setEstimateId(eid);
               setTab("estimate");
+              setAgentRequest((n) => n + 1);
             }}
           />
         </TabsContent>
@@ -62,6 +64,7 @@ export default function ProjectPage() {
             estimates={estimates ?? []}
             estimateId={estimateId}
             onSelect={setEstimateId}
+            agentRequest={agentRequest}
           />
         </TabsContent>
         <TabsContent value="questions" className="pt-3">

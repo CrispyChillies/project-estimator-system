@@ -200,7 +200,7 @@ def _run(db: Session, session_id: uuid.UUID, text: str, user_id, key, model) -> 
         compute_summary(db, s.estimate_id)
     amsg = AgentMessage(id=uuid.uuid4(), session_id=s.id, role="assistant", content=reply, tool_calls=ctx.tool_log,
                         batch_id=batch_id, input_tokens=usage.tin, output_tokens=usage.tout,
-                        payload={"status": ctx.paused or status})
+                        payload={"status": ctx.paused or status, "ask": ctx.ask, "references": ctx.references})
     db.add(amsg)
     s.cost_usd = (s.cost_usd or 0) + usage.cost
     s.tokens = (s.tokens or 0) + usage.tin + usage.tout

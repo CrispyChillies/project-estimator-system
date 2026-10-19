@@ -112,6 +112,86 @@ export interface Provenance {
   source_chunk_ids: string[];
   rules_applied: string[];
   learning: boolean;
+  reference_projects?: ReferenceProject[];
+}
+
+export interface ReferenceProject {
+  project_id: string;
+  name: string;
+  similarity: number;
+  score: number;
+  status: string;
+  data_source: string;
+  why?: string[];
+  total_min?: number;
+  total_max?: number;
+  actual_total?: number | null;
+  notes?: string[];
+}
+
+export type ApplyMode = "auto" | "review";
+
+export interface AgentSessionOut {
+  id: string;
+  estimate_id: string;
+  title: string;
+  summary: string;
+  state: Record<string, unknown>;
+  status: string;
+  pinned: boolean;
+  apply_mode: ApplyMode;
+  use_memory: boolean;
+  run_state: string;
+  cost_usd: number;
+  tokens: number;
+  model_key: string | null;
+  created_at: string;
+  last_activity_at: string | null;
+}
+
+export interface ToolLogEntry {
+  id: string;
+  name: string;
+  ok: boolean;
+  status?: string | null;
+  summary?: string | null;
+  operation_id?: string | null;
+}
+
+export interface AgentMsg {
+  id: string;
+  role: "user" | "assistant" | "system_event";
+  content: string;
+  tool_calls: ToolLogEntry[];
+  payload: Record<string, unknown>;
+  batch_id: string | null;
+  created_at: string;
+}
+
+export interface AgentOperationOut {
+  id: string;
+  session_id: string | null;
+  batch_id: string;
+  op_type: string;
+  status: "pending" | "awaiting_confirmation" | "applied" | "rejected" | "failed" | "reverted";
+  summary: string;
+  result: {
+    before?: [number, number];
+    after?: [number, number];
+    touched_task_ids?: string[];
+    created_ids?: string[];
+    undo?: { applied: number; skipped: { task_id: string; title: string; reason: string }[] };
+  };
+  tool_call_id: string | null;
+  message_id: string | null;
+}
+
+export interface ProjectMemoryOut {
+  id: string;
+  kind: "fact" | "decision" | "constraint" | "preference";
+  text: string;
+  origin: "user" | "agent" | "document";
+  enabled: boolean;
 }
 
 export interface ProposalOp {

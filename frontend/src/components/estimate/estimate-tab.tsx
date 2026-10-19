@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bot, Copy, Download, GitCompare, Loader2, Lock, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { EmptyState, ErrorState, ModelStatusBanner, StatusBadge } from "@/components/common";
@@ -106,11 +106,13 @@ export function EstimateTab({
   estimates,
   estimateId,
   onSelect,
+  agentRequest = 0,
 }: {
   projectId: string;
   estimates: Estimate[];
   estimateId: string | null;
   onSelect: (id: string) => void;
+  agentRequest?: number;
 }) {
   const { data: tree, isLoading, error } = useEstimate(estimateId);
   const { data: summary } = useSummary(estimateId);
@@ -118,7 +120,45 @@ export function EstimateTab({
   const { data: categories } = useCategories();
   const { data: proposals } = useProposals(estimateId);
   const [why, setWhy] = useState<TaskOut | null>(null);
-  const [agent, setAgent] = useState(false);
+  const [agent, setAgentState] = useState(
+    () => typeof window !== "undefined" && window.localStorage.getItem("calibr.agentOpen") === "1",
+  );
+  const setAgent = useCallback((v: boolean | ((a: boolean) => boolean)) => {
+    setAgentState((prev) => {
+      const next = typeof v === "function" ? v(prev) : v;
+      window.localStorage.setItem("calibr.agentOpen", next ? "1" : "0");
+      return next;
+    });
+  }, []);
+  const [agentHl, setAgentHl] = useState<Highlight>({});
+  const hlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flash = useCallback((ids: string[]) => {
+    if (!ids.length) return;
+    setAgentHl(Object.fromEntries(ids.map((id) => [id, "agent" as const])));
+    if (hlTimer.current) clearTimeout(hlTimer.current);
+    hlTimer.current = setTimeout(() => setAgentHl({}), 4000);
+  }, []);
+  const showTasks = useCallback(
+    (ids: string[]) => {
+      flash(ids);
+      document.querySelector(`[data-task-id="${ids[0]}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    },
+    [flash],
+  );
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- open on explicit request (after generation)
+    if (agentRequest) setAgent(true);
+  }, [agentRequest, setAgent]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        setAgent((a) => !a);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [setAgent]);
   const [compareWith, setCompareWith] = useState<string | null>(null);
   const [showRemoved, setShowRemoved] = useState(false);
   const qc = useQueryClient();
@@ -145,8 +185,8 @@ export function EstimateTab({
           for (const c of op.payload.changes as { task_id: string }[]) h[c.task_id] = "update";
       }
     }
-    return h;
-  }, [proposals]);
+    return { ...h, ...agentHl };
+  }, [proposals, agentHl]);
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: qk.estimates(projectId) });
@@ -255,7 +295,13 @@ export function EstimateTab({
         <Button size="sm" variant="outline" onClick={() => clone.mutate()} disabled={!estimateId}>
           <Copy /> Clone
         </Button>
-        <Button size="sm" variant={agent ? "secondary" : "outline"} onClick={() => setAgent((a) => !a)}>
+        <Button
+          size="sm"
+          variant={agent ? "secondary" : "outline"}
+          onClick={() => setAgent((a) => !a)}
+          title="Toggle agent (Ctrl/⌘+J)"
+          aria-keyshortcuts="Control+J Meta+J"
+        >
           <Bot /> Agent
         </Button>
         {!readOnly && (
@@ -316,7 +362,14 @@ export function EstimateTab({
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize="32%" minSize="22%">
-            <AgentPanel estimateId={estimateId} readOnly={!!readOnly} />
+            <AgentPanel
+              estimateId={estimateId}
+              projectId={projectId}
+              readOnly={!!readOnly}
+              onClose={() => setAgent(false)}
+              onPatch={flash}
+              onShowTasks={showTasks}
+            />
           </ResizablePanel>
         </ResizablePanelGroup>
       ) : (

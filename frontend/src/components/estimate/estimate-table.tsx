@@ -35,7 +35,7 @@ import { api } from "@/lib/api";
 import type { Category, EstimateTree, ModuleOut, Role, TaskOut } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export type Highlight = Record<string, "update" | "remove">;
+export type Highlight = Record<string, "update" | "remove" | "agent">;
 
 const CONF: Record<string, string> = {
   low: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
@@ -90,7 +90,7 @@ function TaskRow({
   readOnly: boolean;
   roles: Role[];
   categories: Category[];
-  highlight?: "update" | "remove";
+  highlight?: Highlight[string];
   onWhy: (t: TaskOut) => void;
 }) {
   const patch = usePatchTask(estimateId);
@@ -129,6 +129,7 @@ function TaskRow({
     <>
       <TableRow
         ref={setNodeRef}
+        data-task-id={task.id}
         style={{ transform: CSS.Transform.toString(transform), transition }}
         className={cn(
           "group transition-colors",
@@ -136,6 +137,7 @@ function TaskRow({
           task.removed && "line-through",
           highlight === "update" && "bg-emerald-500/10",
           highlight === "remove" && "bg-rose-500/10",
+          highlight === "agent" && "bg-sky-500/15 duration-700",
           isDragging && "relative z-10 bg-background shadow",
         )}
       >

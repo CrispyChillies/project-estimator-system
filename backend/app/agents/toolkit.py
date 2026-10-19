@@ -216,11 +216,17 @@ class RunContext:
         self.ops_count = 0
         self.applied: list[str] = []
         self.tool_log: list[dict] = []
+        self.ask: dict | None = None
+        self.references: list[dict] | None = None
         self.ex = OperationExecutor(db, self.estimate_id, user_id=user_id, session_id=session.id)
         self.s = get_settings()
         self._call_seq = 0
 
     def emit(self, event: str, data: dict) -> None:
+        if event == "ask_user":
+            self.ask = data
+        elif event == "references":
+            self.references = data.get("items", [])
         self.events.append((event, data))
 
     def drain(self) -> list[tuple[str, dict]]:
@@ -372,6 +378,8 @@ class Toolkit:
         info = {"operation_id": str(rec.id), "summary": summary, "before": b, "after": a,
                 "delta_pct": round(delta_pct, 1), "ops": len(ops)}
         if reasons:
+            rec.result = {"reasons": reasons, "before": b, "after": a, "delta_pct": round(delta_pct, 1),
+                          "touched_task_ids": preview["touched_task_ids"], "preview": True}
             ctx.paused = "awaiting_confirmation"
             ctx.emit("confirmation_required", {**info, "reasons": reasons,
                                                "touched_task_ids": preview["touched_task_ids"]})
@@ -514,7 +522,7 @@ class Toolkit:
     def ask_user(self, a: AskUserArgs, cid: str) -> dict:
         self.ctx.paused = self.ctx.paused or "awaiting_user"
         self.ctx.emit("ask_user", {"question": a.question, "options": a.options})
-        return {"summary": "Asked the user", "message": "Stop and wait for the answer."}
+        return {"summary": a.question, "message": "Stop and wait for the answer."}
 
     # ---------- write tools ----------
     def create_group(self, a: CreateGroupArgs, cid: str) -> dict:

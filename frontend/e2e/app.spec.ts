@@ -88,15 +88,23 @@ test("drag reorder within a module persists", async () => {
   expect(await title(idx + 1)).toBe(t0);
 });
 
-test("agent chat streams and shows a reviewable proposal (recorded live conversation)", async () => {
-  await page.getByRole("button", { name: "Agent" }).click();
-  const box = page.getByPlaceholder("Ask or instruct…");
+test("agent panel edits the estimate directly and can undo", async () => {
+  const box = page.getByRole("textbox", { name: "Message the agent" });
+  // The panel auto-opens after generation; the toolbar button / Ctrl+J toggles it.
+  await expect(box).toBeVisible();
+  await page.keyboard.press("ControlOrMeta+j");
+  await expect(box).toBeHidden();
+  await page.getByRole("button", { name: "Agent", exact: true }).click();
+  await expect(box).toBeEnabled();
   await box.fill("increase backend hours by 20%");
   await box.press("Enter");
-  await expect(page.getByText("Proposed changes").first()).toBeVisible();
+  const card = page.getByTestId("tool-card").last();
+  await expect(card).toContainText("Bulk adjust");
+  await expect(card).toContainText("applied");
   await shot("agent");
-  await page.getByRole("button", { name: "Accept" }).first().click();
-  await expect(page.getByText("Applied and logged")).toBeVisible();
+  await card.getByRole("button", { name: "Undo" }).click();
+  await expect(page.getByText("Undone")).toBeVisible();
+  await expect(card).toContainText("reverted");
 });
 
 test("finalize updates learning", async () => {
@@ -148,6 +156,8 @@ test("settings: rate card, hyperparameter, reset dialog, LLM usage", async () =>
   await expect(page.getByRole("alertdialog")).toBeHidden();
   await expect(page.getByText(/mode: (replay|live|record|fake)/)).toBeVisible();
   await expect(page.getByText(/Live spend, all time/)).toBeVisible();
+  await expect(page.getByText("Retrieval (similar past projects)")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "retrieval_k" })).toHaveValue("3");
   await shot("settings");
 });
 

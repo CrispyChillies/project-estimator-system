@@ -1,261 +1,687 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bot, Check, Send, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  Bot,
+  Brain,
+  Check,
+  ChevronDown,
+  Crosshair,
+  Loader2,
+  MessageCircleQuestion,
+  Pin,
+  Plus,
+  Send,
+  Sparkles,
+  Square,
+  Trash2,
+  Undo2,
+  Wrench,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { MemoryDrawer } from "@/components/estimate/memory-drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { errorToast, useInvalidateEstimate, useLLMUsage, useProposals } from "@/hooks/queries";
+import {
+  ak,
+  useAgentMessages,
+  useAgentOps,
+  useAgentSessions,
+  useCreateSession,
+  useDeleteSession,
+  usePatchSession,
+} from "@/hooks/agent";
+import { errorToast, useDocuments, useInvalidateEstimate, useLLMUsage } from "@/hooks/queries";
 import { api, postSSE } from "@/lib/api";
-import type { BulkChange, Proposal, ProposalOp } from "@/lib/types";
+import type { AgentMsg, AgentOperationOut, ReferenceProject, ToolLogEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-interface Msg {
-  role: "user" | "assistant";
-  text: string;
+export interface PatchHandlers {
+  onPatch: (taskIds: string[]) => void;
+  onShowTasks: (taskIds: string[]) => void;
 }
 
-const EXAMPLES = ["increase backend hours by 20% and add an SSO task", "explain ERP integration", "remove the push notifications task"];
+const SLASH = [
+  { cmd: "/fit ", hint: "/fit 400 — fit total max hours to a budget" },
+  { cmd: "/adjust ", hint: "/adjust +10% backend — scale hours" },
+  { cmd: "/round", hint: "/round — round all hours to 0.5 h" },
+  { cmd: "/similar", hint: "/similar — 3 most similar past projects" },
+  { cmd: "/remember ", hint: "/remember <fact> — save to project memory" },
+  { cmd: "/budget ", hint: "/budget 400 — set the session budget" },
+  { cmd: "/new", hint: "/new — start a new session" },
+];
 
-function OpDiff({ op }: { op: ProposalOp }) {
-  const p = op.payload;
-  if (op.type === "bulk_adjust" && Array.isArray(p.changes)) {
-    return (
-      <ul className="mt-1 space-y-0.5 text-xs">
-        {(p.changes as BulkChange[]).slice(0, 8).map((c) => (
-          <li key={c.task_id} className="flex justify-between gap-2">
-            <span className="truncate">{c.title}</span>
-            <span className="shrink-0 tabular-nums">
-              <span className="text-rose-600 line-through">
-                {c.old_min}–{c.old_max}
-              </span>{" "}
-              <span className="text-emerald-600">
-                {c.new_min}–{c.new_max}
-              </span>
-            </span>
-          </li>
-        ))}
-        {(p.changes as BulkChange[]).length > 8 && <li className="text-muted-foreground">…and more</li>}
-      </ul>
-    );
-  }
-  if (op.type === "add_task")
-    return (
-      <div className="mt-1 text-xs text-emerald-600">
-        + {p.title} ({p.min_hours}–{p.max_hours} h)
-      </div>
-    );
-  if (op.type === "remove_task") return <div className="mt-1 text-xs text-rose-600 line-through">− {p.title}</div>;
-  if (op.type === "update_task" && p.before)
-    return (
-      <div className="mt-1 text-xs">
-        <span className="text-rose-600 line-through">
-          {p.before.min_hours}–{p.before.max_hours} h
-        </span>{" "}
-        <span className="text-emerald-600">{JSON.stringify(p.changes)}</span>
-      </div>
-    );
-  return null;
+const STARTERS = [
+  { label: "Analyze & draft estimate", text: "Analyze the draft estimate" },
+  { label: "Find ambiguities first", text: "Find ambiguities first" },
+  { label: "Show similar past projects (k=3)", text: "/similar 3" },
+  { label: "Set a budget", text: "/budget ", prefill: true },
+];
+
+const TOOL_LABEL: Record<string, string> = {
+  fit_to_budget: "Fit to budget",
+  rebalance_roles: "Rebalance roles",
+  bulk_adjust: "Bulk adjust",
+  set_hours: "Set hours",
+  create_task: "Create task",
+  create_group: "Create group",
+  update_task: "Update task",
+  split_task: "Split task",
+  merge_tasks: "Merge tasks",
+  move_tasks: "Move tasks",
+  toggle_visibility: "Show / hide",
+  delete_tasks: "Delete",
+  remember: "Remember",
+  ask_user: "Question",
+  retrieve_similar_projects: "Similar projects",
+  run_analysis: "Analysis",
+  get_estimate_summary: "Estimate summary",
+  list_tasks: "List tasks",
+  explain_task: "Explain task",
+};
+
+type Live =
+  | { kind: "user"; text: string }
+  | { kind: "tool"; id: string; name: string; result?: LiveResult }
+  | { kind: "ask"; question: string; options: string[] }
+  | { kind: "refs"; items: ReferenceProject[] }
+  | { kind: "text"; text: string };
+
+interface LiveResult {
+  ok: boolean;
+  status?: string;
+  summary?: string;
+  message?: string;
+  operation_id?: string;
+  before?: [number, number];
+  after?: [number, number];
+  reasons?: string[];
 }
 
-export function ProposalCard({ proposal, estimateId }: { proposal: Proposal; estimateId: string }) {
-  const invalidate = useInvalidateEstimate();
-  const qc = useQueryClient();
-  const act = useMutation({
-    mutationFn: (path: string) => api<Proposal>(`/proposals/${proposal.id}/${path}`, { method: "POST" }),
-    onSuccess: (p) => {
-      qc.setQueryData(["proposal", p.id], p);
-      invalidate(estimateId);
-      toast.success("Applied and logged");
-    },
-    onError: errorToast,
-  });
-  const ops = proposal.ops as unknown as ProposalOp[];
-  const pending = ops.filter((o) => o.status === "pending").length;
+const range = (r?: [number, number]) => (r ? `${r[0]}–${r[1]} h` : "");
+
+function sessionKey(estimateId: string) {
+  return `calibr.agentSession.${estimateId}`;
+}
+
+function ToolCard({
+  name,
+  entry,
+  op,
+  busy,
+  onAct,
+  onShow,
+}: {
+  name: string;
+  entry?: LiveResult | ToolLogEntry;
+  op?: AgentOperationOut;
+  busy: boolean;
+  onAct: (path: string, op: AgentOperationOut | string) => void;
+  onShow: (ids: string[]) => void;
+}) {
+  const live = entry as LiveResult | undefined;
+  const status = op?.status ?? live?.status ?? (entry ? (entry.ok ? "done" : "error") : "running");
+  const before = op?.result.before ?? live?.before;
+  const after = op?.result.after ?? live?.after;
+  const reasons = (op?.result as { reasons?: string[] } | undefined)?.reasons ?? live?.reasons;
+  const ids = [...(op?.result.touched_task_ids ?? []), ...(op?.result.created_ids ?? [])];
+  const text = entry?.summary ?? live?.message;
+  const opId = op?.id ?? live?.operation_id;
+  const undo = op?.result.undo;
   return (
-    <div className="rounded-lg border bg-card p-2.5 text-sm">
-      <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground">Proposed changes</span>
-        {pending > 1 && (
-          <div className="flex gap-1">
-            <Button size="xs" variant="outline" onClick={() => act.mutate("reject_all")}>
-              Reject all
-            </Button>
-            <Button size="xs" onClick={() => act.mutate("accept_all")}>
-              Accept all
-            </Button>
-          </div>
-        )}
+    <div
+      className={cn(
+        "rounded-lg border bg-card p-2 text-xs",
+        status === "awaiting_confirmation" && "border-amber-500/60",
+        (status === "error" || status === "failed") && "border-rose-500/50",
+      )}
+      data-testid="tool-card"
+    >
+      <div className="flex items-center gap-1.5">
+        {!entry ? <Loader2 className="size-3.5 animate-spin" /> : <Wrench className="size-3.5 text-muted-foreground" />}
+        <span className="font-medium">{TOOL_LABEL[name] ?? name}</span>
+        <Badge variant="outline" className="ml-auto h-4 px-1.5 text-[10px]">
+          {status.replaceAll("_", " ")}
+        </Badge>
       </div>
-      <div className="space-y-1.5">
-        {ops.map((op) => (
-          <div
-            key={op.id}
-            className={cn(
-              "rounded-md border-l-2 bg-muted/40 p-2",
-              op.status === "accepted" && "border-emerald-500",
-              op.status === "rejected" && "border-rose-500 opacity-60",
-              op.status === "pending" && "border-amber-500",
-            )}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="font-medium">{op.summary}</div>
-                {op.rationale && <div className="text-xs text-muted-foreground">{op.rationale}</div>}
-                <OpDiff op={op} />
-              </div>
-              {op.status === "pending" ? (
-                <div className="flex shrink-0 gap-1">
-                  <Button size="icon-xs" variant="outline" aria-label="Reject" onClick={() => act.mutate(`ops/${op.id}/reject`)}>
-                    <X />
-                  </Button>
-                  <Button size="icon-xs" aria-label="Accept" onClick={() => act.mutate(`ops/${op.id}/accept`)}>
-                    <Check />
-                  </Button>
-                </div>
-              ) : (
-                <Badge variant="secondary">{op.status}</Badge>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      {text && <div className={cn("mt-1", entry && !entry.ok && "text-rose-600")}>{text}</div>}
+      {before && after && (
+        <div className="mt-1 tabular-nums text-muted-foreground">
+          Total {range(before)} → <span className="font-medium text-foreground">{range(after)}</span>
+        </div>
+      )}
+      {status === "awaiting_confirmation" && reasons?.length ? (
+        <ul className="mt-1 list-disc pl-4 text-amber-700 dark:text-amber-400">
+          {reasons.map((r) => (
+            <li key={r}>{r}</li>
+          ))}
+        </ul>
+      ) : null}
+      {undo && undo.skipped.length > 0 && (
+        <div className="mt-1 text-amber-700 dark:text-amber-400">
+          Partial undo: kept {undo.skipped.map((s) => s.title).join(", ")} (edited after the agent change).
+        </div>
+      )}
+      {opId && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {ids.length > 0 && (
+            <Button size="xs" variant="ghost" onClick={() => onShow(ids)}>
+              <Crosshair /> Show in table
+            </Button>
+          )}
+          {status === "applied" && (
+            <Button size="xs" variant="outline" disabled={busy} onClick={() => onAct("undo", op ?? opId)}>
+              <Undo2 /> Undo
+            </Button>
+          )}
+          {status === "awaiting_confirmation" && (
+            <>
+              <Button size="xs" disabled={busy} onClick={() => onAct("confirm", op ?? opId)}>
+                <Check /> Confirm
+              </Button>
+              <Button size="xs" variant="outline" disabled={busy} onClick={() => onAct("reject", op ?? opId)}>
+                <X /> Reject
+              </Button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-export function AgentPanel({ estimateId, readOnly }: { estimateId: string; readOnly: boolean }) {
-  const [messages, setMessages] = useState<Msg[]>([]);
-  const [text, setText] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState("chat");
-  const sessionRef = useRef<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const { data: pending, refetch } = useProposals(estimateId);
+function AskCard({ question, options, onPick, disabled }: { question: string; options: string[]; onPick: (o: string) => void; disabled: boolean }) {
+  return (
+    <div className="rounded-lg border border-sky-500/50 bg-sky-500/5 p-2 text-xs">
+      <div className="flex items-center gap-1.5 font-medium">
+        <MessageCircleQuestion className="size-3.5" /> {question}
+      </div>
+      {options.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {options.map((o) => (
+            <Button key={o} size="xs" variant="outline" disabled={disabled} onClick={() => onPick(o)}>
+              {o}
+            </Button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RefsCard({ items }: { items: ReferenceProject[] }) {
+  return (
+    <div className="rounded-lg border p-2 text-xs" data-testid="references-card">
+      <div className="mb-1 font-medium">References · similar past projects</div>
+      {items.length === 0 ? (
+        <div className="text-muted-foreground">None above the similarity threshold (fewer is better than weak matches).</div>
+      ) : (
+        <ul className="space-y-1">
+          {items.map((r) => (
+            <li key={r.project_id} className="rounded-md bg-muted/40 px-2 py-1">
+              <div className="flex justify-between gap-2">
+                <span className="font-medium">{r.name}</span>
+                <span className="tabular-nums text-muted-foreground">sim {r.similarity.toFixed(2)}</span>
+              </div>
+              <div className="text-muted-foreground">
+                {r.status}
+                {r.total_min !== undefined && ` · ${r.total_min}–${r.total_max} h`}
+                {r.actual_total ? ` · actual ${r.actual_total} h` : ""}
+              </div>
+              {r.notes?.[0] && <div className="text-muted-foreground">{r.notes[0]}</div>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function Bubble({ role, children }: { role: "user" | "assistant" | "event"; children: React.ReactNode }) {
+  return (
+    <div
+      className={cn(
+        "max-w-[92%] rounded-lg px-2.5 py-1.5 text-sm whitespace-pre-wrap",
+        role === "user" && "ml-auto bg-primary text-primary-foreground",
+        role === "assistant" && "bg-muted",
+        role === "event" && "mx-auto bg-transparent text-center text-xs text-muted-foreground",
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function AgentPanel({
+  estimateId,
+  projectId,
+  readOnly,
+  onClose,
+  onPatch,
+  onShowTasks,
+}: {
+  estimateId: string;
+  projectId: string;
+  readOnly: boolean;
+  onClose: () => void;
+} & PatchHandlers) {
+  const qc = useQueryClient();
+  const invalidate = useInvalidateEstimate();
+  const { data: sessions } = useAgentSessions(estimateId);
+  const { data: docs } = useDocuments(projectId);
   const { data: usage } = useLLMUsage();
   const offline = !!usage && !(["live", "record"] as string[]).includes(usage.mode);
-  const invalidate = useInvalidateEstimate();
+  const [picked, setPicked] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : window.localStorage.getItem(sessionKey(estimateId)),
+  );
+  const sessionId = sessions?.find((s) => s.id === picked)?.id ?? sessions?.[0]?.id ?? null;
+  const session = sessions?.find((s) => s.id === sessionId);
+  const [live, setLive] = useState<Live[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [acting, setActing] = useState(false);
+  const [text, setText] = useState("");
+  const [memOpen, setMemOpen] = useState(false);
+  const remoteRunning = session?.run_state === "running" && !busy;
+  const { data: messages } = useAgentMessages(sessionId, remoteRunning);
+  const { data: ops } = useAgentOps(sessionId);
+  const create = useCreateSession(estimateId);
+  const patch = usePatchSession(estimateId);
+  const del = useDeleteSession(estimateId);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const creating = useRef(false);
+  const opById = useMemo(() => new Map((ops ?? []).map((o) => [o.id, o])), [ops]);
+
+  const defaultTitle = docs?.length ? docs.map((d) => d.filename).join(", ").slice(0, 80) : "New session";
+
+  useEffect(() => {
+    if (sessionId) window.localStorage.setItem(sessionKey(estimateId), sessionId);
+  }, [sessionId, estimateId]);
+
+  useEffect(() => {
+    // One session per estimate exists from the start, titled after the uploaded files.
+    if (sessions && sessions.length === 0 && !readOnly && !creating.current && docs) {
+      creating.current = true;
+      create.mutate({ title: defaultTitle });
+    }
+  }, [sessions, readOnly, docs, create, defaultTitle]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [messages, pending]);
+  }, [messages, live, ops]);
 
-  const send = async (t: string) => {
-    if (!t.trim() || busy) return;
-    setMessages((m) => [...m, { role: "user", text: t }, { role: "assistant", text: "" }]);
+  const refreshAgent = async () => {
+    if (!sessionId) return;
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ak.messages(sessionId) }),
+      qc.refetchQueries({ queryKey: ak.ops(sessionId) }),
+      qc.invalidateQueries({ queryKey: ak.sessions(estimateId) }),
+      qc.invalidateQueries({ queryKey: ak.memories(estimateId) }),
+    ]);
+  };
+
+  const newSession = async () => {
+    const s = await create.mutateAsync({ title: defaultTitle });
+    setPicked(s.id);
+    setLive([]);
+  };
+
+  const send = async (raw: string) => {
+    const t = raw.trim();
+    if (!t || busy || readOnly) return;
+    if (t === "/new") {
+      setText("");
+      await newSession();
+      return;
+    }
+    if (!sessionId) return;
     setText("");
     setBusy(true);
+    setLive([{ kind: "user", text: t }]);
+    const push = (item: Live) => setLive((l) => [...l, item]);
     try {
       await postSSE(
-        `/estimates/${estimateId}/agent/messages`,
-        { text: t, session_id: sessionRef.current },
+        `/agent/sessions/${sessionId}/runs`,
+        { text: t, idempotency_key: crypto.randomUUID() },
         {
           onEvent: (ev, data) => {
-            const d = data as Record<string, string>;
-            if (ev === "session") sessionRef.current = d.session_id;
-            if (ev === "token")
-              setMessages((m) => {
-                const copy = [...m];
-                copy[copy.length - 1] = { role: "assistant", text: copy[copy.length - 1].text + d.text };
-                return copy;
+            const d = data as Record<string, unknown>;
+            if (ev === "tool_call_started") push({ kind: "tool", id: String(d.id), name: String(d.name) });
+            if (ev === "tool_call_result")
+              setLive((l) => l.map((x) => (x.kind === "tool" && x.id === d.id ? { ...x, result: d as unknown as LiveResult } : x)));
+            if (ev === "confirmation_required") {
+              const opId = String(d.operation_id);
+              setLive((l) =>
+                l.map((x) =>
+                  x.kind === "tool" && x.result?.operation_id === opId
+                    ? { ...x, result: { ...x.result, reasons: d.reasons as string[] } }
+                    : x,
+                ),
+              );
+            }
+            if (ev === "table_patch") {
+              onPatch([...((d.task_ids as string[]) ?? []), ...((d.created_ids as string[]) ?? [])]);
+              invalidate(estimateId);
+              void qc.invalidateQueries({ queryKey: ak.ops(sessionId) });
+            }
+            if (ev === "ask_user") push({ kind: "ask", question: String(d.question), options: (d.options as string[]) ?? [] });
+            if (ev === "references") push({ kind: "refs", items: (d.items as ReferenceProject[]) ?? [] });
+            if (ev === "memory_updated") void qc.invalidateQueries({ queryKey: ak.memories(estimateId) });
+            if (ev === "message_delta")
+              setLive((l) => {
+                const last = l[l.length - 1];
+                if (last?.kind === "text") return [...l.slice(0, -1), { kind: "text", text: last.text + String(d.text) }];
+                return [...l, { kind: "text", text: String(d.text) }];
               });
-            if (ev === "proposal") void refetch();
-            if (ev === "error") toast.error(d.message);
+            if (ev === "error") toast.error(String(d.message));
           },
         },
       );
     } catch (e) {
       errorToast(e);
     } finally {
+      await refreshAgent();
+      setLive([]);
       setBusy(false);
       invalidate(estimateId);
     }
   };
 
-  return (
-    <div className="flex h-full flex-col gap-2 p-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 font-medium">
-          <Bot className="size-4" /> AI Agent
-          {offline && (
-            <Badge variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-400">
-              Offline demo agent
-            </Badge>
-          )}
-        </div>
-        <ToggleGroup value={[mode]} onValueChange={(v) => v.length && setMode(String(v[0]))} size="sm" variant="outline">
-          <ToggleGroupItem value="chat">Chat</ToggleGroupItem>
-          <ToggleGroupItem value="generate">Generate</ToggleGroupItem>
-        </ToggleGroup>
+  const act = async (path: string, op: AgentOperationOut | string) => {
+    const id = typeof op === "string" ? op : op.id;
+    setActing(true);
+    try {
+      const res = await api<AgentOperationOut & { undo?: { partial: boolean } }>(`/agent/operations/${id}/${path}`, {
+        method: "POST",
+      });
+      onPatch([...(res.result.touched_task_ids ?? []), ...(res.result.created_ids ?? [])]);
+      if (path === "undo" && res.undo?.partial) toast.warning("Partially undone: rows you edited afterwards were kept");
+      else toast.success(path === "confirm" ? "Applied" : path === "undo" ? "Undone" : "Rejected");
+    } catch (e) {
+      errorToast(e);
+    } finally {
+      setActing(false);
+      invalidate(estimateId);
+      await refreshAgent();
+    }
+  };
+
+  const undoAll = async (batchId: string) => {
+    setActing(true);
+    try {
+      await api(`/agent/batches/${batchId}/undo`, { method: "POST" });
+      toast.success("Undid all changes from that turn");
+    } catch (e) {
+      errorToast(e);
+    } finally {
+      setActing(false);
+      invalidate(estimateId);
+      await refreshAgent();
+    }
+  };
+
+  const cancel = async () => {
+    if (sessionId) await api(`/agent/sessions/${sessionId}/cancel`, { method: "POST" }).catch(errorToast);
+  };
+
+  const budget = session?.state?.budget_hours as number | undefined;
+  const slashOpen = text.startsWith("/") && !text.includes(" ") && !busy;
+  const shown = messages ?? [];
+
+  const renderPersisted = (m: AgentMsg) => {
+    if (m.role === "user") return <Bubble key={m.id} role="user">{m.content}</Bubble>;
+    if (m.role === "system_event") return <Bubble key={m.id} role="event">{m.content}</Bubble>;
+    const applied = (ops ?? []).filter((o) => o.batch_id === m.batch_id && o.status === "applied");
+    const ask = m.payload.ask as { question: string; options: string[] } | null | undefined;
+    const refs = m.payload.references as ReferenceProject[] | null | undefined;
+    const waiting = m.payload.status === "awaiting_user" && m.id === shown[shown.length - 1]?.id;
+    return (
+      <div key={m.id} className="space-y-1.5">
+        {m.tool_calls
+          .filter((c) => c.name !== "ask_user" && c.name !== "retrieve_similar_projects")
+          .map((c) => (
+            <ToolCard
+              key={c.id}
+              name={c.name}
+              entry={c}
+              op={c.operation_id ? opById.get(c.operation_id) : undefined}
+              busy={acting || busy}
+              onAct={(p, o) => void act(p, o)}
+              onShow={onShowTasks}
+            />
+          ))}
+        {refs && <RefsCard items={refs} />}
+        {m.content && <Bubble role="assistant">{m.content}</Bubble>}
+        {ask && waiting && <AskCard {...ask} disabled={busy || readOnly} onPick={(o) => void send(o)} />}
+        {applied.length > 1 && m.batch_id && (
+          <Button size="xs" variant="ghost" disabled={acting || busy} onClick={() => void undoAll(m.batch_id!)}>
+            <Undo2 /> Undo all {applied.length} changes
+          </Button>
+        )}
       </div>
-      <p className="text-xs text-muted-foreground">
-        {offline
-          ? "LLM_MODE is not live: recorded live conversations are replayed when the prompt matches, otherwise a deterministic command parser answers. "
-          : ""}
-        The agent never edits directly: every change is a reviewable proposal, logged when you accept or reject it.
-      </p>
-      <ScrollArea className="min-h-0 flex-1 rounded-md border">
-        <div className="space-y-2 p-2">
-          {messages.length === 0 && (
-            <div className="space-y-1.5">
-              {EXAMPLES.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  className="block w-full rounded-md border px-2 py-1.5 text-left text-xs hover:bg-accent"
-                  onClick={() => void send(e)}
-                  disabled={readOnly}
-                >
-                  {e}
-                </button>
+    );
+  };
+
+  return (
+    <div className="flex h-full flex-col gap-2 p-3" aria-label="Agent panel">
+      <div className="flex items-center gap-1.5">
+        <Bot className="size-4" />
+        <span className="font-medium">Agent</span>
+        {offline && (
+          <Badge variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-400">
+            offline planner
+          </Badge>
+        )}
+        <div className="ml-auto flex items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button size="xs" variant="outline" className="max-w-44" />}>
+              <span className="truncate">{session?.title ?? "Session"}</span>
+              <ChevronDown />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              {(sessions ?? []).map((s) => (
+                <DropdownMenuItem key={s.id} onClick={() => setPicked(s.id)}>
+                  {s.pinned && <Pin className="size-3" />}
+                  <span className={cn("truncate", s.id === sessionId && "font-medium")}>{s.title}</span>
+                </DropdownMenuItem>
               ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => void newSession()} disabled={readOnly}>
+                <Plus /> New session
+              </DropdownMenuItem>
+              {session && (
+                <>
+                  <DropdownMenuItem onClick={() => patch.mutate({ id: session.id, patch: { pinned: !session.pinned } })}>
+                    <Pin /> {session.pinned ? "Unpin" : "Pin"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      const title = window.prompt("Rename session", session.title);
+                      if (title) patch.mutate({ id: session.id, patch: { title } });
+                    }}
+                  >
+                    Rename…
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => {
+                      del.mutate(session.id);
+                      setPicked(null);
+                    }}
+                  >
+                    <Trash2 /> Delete session
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button size="icon-xs" variant="ghost" aria-label="Memory" onClick={() => setMemOpen(true)}>
+            <Brain />
+          </Button>
+          <Button size="icon-xs" variant="ghost" aria-label="Close agent panel" onClick={onClose}>
+            <X />
+          </Button>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <ToggleGroup
+          value={[session?.apply_mode ?? "auto"]}
+          onValueChange={(v) =>
+            session && v.length && patch.mutate({ id: session.id, patch: { apply_mode: v[0] as "auto" | "review" } })
+          }
+          size="sm"
+          variant="outline"
+          aria-label="Apply mode"
+        >
+          <ToggleGroupItem value="auto">Auto</ToggleGroupItem>
+          <ToggleGroupItem value="review">Review</ToggleGroupItem>
+        </ToggleGroup>
+        {budget !== undefined && <Badge variant="secondary">Budget {budget} h</Badge>}
+        <Badge variant="secondary">{session?.use_memory === false ? "Memory off" : "Memory on"}</Badge>
+        <Badge variant="secondary">k=3 refs</Badge>
+      </div>
+
+      <ScrollArea className="min-h-0 flex-1 rounded-md border">
+        <div className="space-y-2 p-2" aria-live="polite">
+          {shown.length === 0 && live.length === 0 && (
+            <div className="space-y-2">
+              <Bubble role="assistant">
+                {docs?.length
+                  ? `I've read ${docs.map((d) => d.filename).join(", ")}. `
+                  : ""}
+                I work directly on this estimate: changes show up in the table, and every change can be undone. Deletes
+                and big swings ask you first.
+              </Bubble>
+              <div className="flex flex-wrap gap-1.5">
+                {STARTERS.map((s) => (
+                  <Button
+                    key={s.label}
+                    size="xs"
+                    variant="outline"
+                    disabled={readOnly || !sessionId}
+                    onClick={() => {
+                      if (s.prefill) {
+                        setText(s.text);
+                        inputRef.current?.focus();
+                      } else void send(s.text);
+                    }}
+                  >
+                    <Sparkles /> {s.label}
+                  </Button>
+                ))}
+              </div>
             </div>
           )}
-          {messages.map((m, i) => (
-            <div
-              key={i}
-              className={cn(
-                "max-w-[90%] rounded-lg px-2.5 py-1.5 text-sm whitespace-pre-wrap",
-                m.role === "user" ? "ml-auto bg-primary text-primary-foreground" : "bg-muted",
-              )}
-            >
-              {m.text || (busy && i === messages.length - 1 ? "…" : "")}
+          {shown.map(renderPersisted)}
+          {live.map((item, i) => {
+            if (item.kind === "user") return <Bubble key={i} role="user">{item.text}</Bubble>;
+            if (item.kind === "text") return <Bubble key={i} role="assistant">{item.text}</Bubble>;
+            if (item.kind === "ask")
+              return <AskCard key={i} question={item.question} options={item.options} disabled onPick={() => undefined} />;
+            if (item.kind === "refs") return <RefsCard key={i} items={item.items} />;
+            if (item.name === "ask_user" || item.name === "retrieve_similar_projects") return null;
+            return (
+              <ToolCard
+                key={i}
+                name={item.name}
+                entry={item.result}
+                op={item.result?.operation_id ? opById.get(item.result.operation_id) : undefined}
+                busy
+                onAct={() => undefined}
+                onShow={onShowTasks}
+              />
+            );
+          })}
+          {(busy || remoteRunning) && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" /> {remoteRunning ? "Agent is still working…" : "Working…"}
             </div>
-          ))}
-          {pending?.map((p) => (
-            <ProposalCard key={p.id} proposal={p} estimateId={estimateId} />
-          ))}
+          )}
           <div ref={bottomRef} />
         </div>
       </ScrollArea>
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void send(mode === "generate" ? `add ${text}` : text);
-        }}
-      >
-        <Textarea
-          rows={2}
-          value={text}
-          disabled={readOnly}
-          placeholder={readOnly ? "Estimate is final — clone it to change" : mode === "generate" ? "Describe a task to add…" : "Ask or instruct…"}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void send(mode === "generate" ? `add ${text}` : text);
-            }
+
+      <div className="relative">
+        {slashOpen && (
+          <div className="absolute bottom-full mb-1 w-full rounded-md border bg-popover p-1 text-xs shadow-md" role="listbox">
+            {SLASH.filter((s) => s.cmd.startsWith(text)).map((s) => (
+              <button
+                key={s.cmd}
+                type="button"
+                role="option"
+                aria-selected={false}
+                className="block w-full rounded px-2 py-1 text-left hover:bg-accent"
+                onClick={() => {
+                  setText(s.cmd);
+                  inputRef.current?.focus();
+                }}
+              >
+                {s.hint}
+              </button>
+            ))}
+          </div>
+        )}
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send(text);
           }}
+        >
+          <Textarea
+            ref={inputRef}
+            rows={2}
+            value={text}
+            disabled={readOnly}
+            aria-label="Message the agent"
+            placeholder={readOnly ? "Estimate is final — clone it to change" : "Ask or instruct… (/ for commands)"}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void send(text);
+              }
+            }}
+          />
+          {busy ? (
+            <Button type="button" size="icon" variant="outline" aria-label="Stop" onClick={() => void cancel()}>
+              <Square />
+            </Button>
+          ) : (
+            <Button type="submit" size="icon" disabled={readOnly || !sessionId} aria-label="Send">
+              <Send />
+            </Button>
+          )}
+        </form>
+      </div>
+      <div className="flex justify-between text-[11px] text-muted-foreground">
+        <span>{session?.apply_mode === "review" ? "Review mode: every change waits for you" : "Auto mode: safe changes apply"}</span>
+        <span className="tabular-nums" data-testid="agent-cost">
+          {offline ? "offline · $0" : `$${(session?.cost_usd ?? 0).toFixed(4)} · ${((session?.tokens ?? 0) / 1000).toFixed(1)}k tok`}
+        </span>
+      </div>
+      {session && (
+        <MemoryDrawer
+          open={memOpen}
+          onOpenChange={setMemOpen}
+          estimateId={estimateId}
+          session={session}
+          onPatch={(p) => patch.mutate({ id: session.id, patch: p })}
         />
-        <Button type="submit" size="icon" disabled={busy || readOnly} aria-label="Send">
-          <Send />
-        </Button>
-      </form>
+      )}
     </div>
   );
 }

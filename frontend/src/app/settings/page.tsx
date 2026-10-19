@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { errorToast, useCategories, useLearningSettings, useLLMUsage, useRoles } from "@/hooks/queries";
@@ -59,6 +60,69 @@ function RateRow({ role }: { role: Role }) {
   );
 }
 
+const isRetrievalKey = (k: string) => k.startsWith("retrieval_") || k === "analog_blend_enabled";
+
+function RetrievalCard() {
+  const { data } = useLearningSettings();
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const save = useMutation({
+    mutationFn: (values: Record<string, unknown>) => api("/settings/learning", { method: "PUT", json: values }),
+    onSuccess: () => {
+      setDraft({});
+      void qc.invalidateQueries({ queryKey: ["learning-settings"] });
+      toast.success("Retrieval settings saved");
+    },
+    onError: errorToast,
+  });
+  if (!data) return <Skeleton className="h-48" />;
+  const entries = Object.entries(data.values).filter(([k]) => isRetrievalKey(k));
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Retrieval (similar past projects)</CardTitle>
+            <CardDescription>
+              The k most similar past projects are added as context to decomposition and estimation. Below the threshold
+              fewer are used — never padded.
+            </CardDescription>
+          </div>
+          <Button
+            size="sm"
+            aria-label="Save retrieval settings"
+            disabled={!Object.keys(draft).length}
+            onClick={() => save.mutate(Object.fromEntries(Object.entries(draft).map(([k, v]) => [k, Number(v)])))}
+          >
+            Save
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-2 sm:grid-cols-2">
+        {entries.map(([k, v]) => (
+          <div key={k} className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5">
+            <div className="text-sm">
+              <code className="text-xs">{k}</code>
+              <div className="text-xs text-muted-foreground">{data.descriptions[k]}</div>
+            </div>
+            {typeof v === "boolean" ? (
+              <Switch checked={v} aria-label={k} onCheckedChange={(c) => save.mutate({ [k]: c })} />
+            ) : (
+              <Input
+                className="h-7 w-20 text-right"
+                inputMode="decimal"
+                aria-label={k}
+                value={draft[k] ?? String(v)}
+                onChange={(e) => setDraft((d) => ({ ...d, [k]: e.target.value }))}
+              />
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 function LearningCard() {
   const { data } = useLearningSettings();
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -67,9 +131,7 @@ function LearningCard() {
     mutationFn: () =>
       api("/settings/learning", {
         method: "PUT",
-        json: Object.fromEntries(
-          Object.entries(draft).map(([k, v]) => [k, v === "true" ? true : v === "false" ? false : Number(v)]),
-        ),
+        json: Object.fromEntries(Object.entries(draft).map(([k, v]) => [k, Number(v)])),
       }),
     onSuccess: () => {
       setDraft({});
@@ -105,7 +167,7 @@ function LearningCard() {
         </div>
       </CardHeader>
       <CardContent className="grid gap-2 sm:grid-cols-2">
-        {Object.entries(data.values).map(([k, v]) => (
+        {Object.entries(data.values).filter(([k]) => !isRetrievalKey(k)).map(([k, v]) => (
           <div key={k} className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5">
             <div className="flex items-center gap-1 text-sm">
               <code className="text-xs">{k}</code>
@@ -238,6 +300,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+      <RetrievalCard />
       <LearningCard />
       <Card>
         <CardHeader>

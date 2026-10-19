@@ -68,7 +68,17 @@ export interface SSEHandlers {
 export async function postSSE(path: string, json: unknown, { onEvent, signal }: SSEHandlers) {
   const h = headers({ "Content-Type": "application/json" });
   const res = await fetch(`${BASE}${path}`, { method: "POST", headers: h, body: JSON.stringify(json), signal });
-  if (!res.ok || !res.body) throw new ApiError(res.status, "stream_error", "Agent request failed");
+  if (!res.ok || !res.body) {
+    let code = "stream_error";
+    let message = "Agent request failed";
+    try {
+      const data = (await res.json()) as { error?: { code: string; message: string } };
+      if (data.error) ({ code, message } = data.error);
+    } catch {
+      /* not JSON */
+    }
+    throw new ApiError(res.status, code, message);
+  }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buf = "";

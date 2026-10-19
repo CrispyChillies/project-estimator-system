@@ -130,6 +130,29 @@ export function WhySheet({ task, onClose }: { task: TaskOut | null; onClose: () 
                   )}
                 </Section>
                 <Separator />
+                <Section title="Similar past projects used as context">
+                  {prov?.reference_projects?.length ? (
+                    <ul className="space-y-1.5 text-xs">
+                      {prov.reference_projects.map((r) => (
+                        <li key={r.project_id} className="rounded-md border px-2 py-1.5">
+                          <div className="flex justify-between gap-2">
+                            <span className="font-medium">{r.name}</span>
+                            <span className="tabular-nums text-muted-foreground">sim {num(r.similarity, 2)}</span>
+                          </div>
+                          <div className="text-muted-foreground">
+                            {r.status} · {r.data_source}
+                            {r.why?.length ? ` · ${r.why.slice(1).join(" · ")}` : ""}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      None — no past project above the similarity threshold, or retrieval was off.
+                    </p>
+                  )}
+                </Section>
+                <Separator />
                 <Section title="Rules applied">
                   {prov?.rules_applied.length ? (
                     <ul className="list-disc space-y-1 pl-4 text-xs">

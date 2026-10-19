@@ -123,3 +123,8 @@ Short log of choices made where the brief was ambiguous or reality forced a devi
 43. **Slash commands bypass the LLM** in every mode and go through the deterministic planner, which also
     serves fake/replay mode, so the offline demo exercises the same tools, policy and events as live mode.
     The legacy proposal-based `/agent/messages` endpoint stays for the current UI until Phase 5 replaces it.
+44. **Agent panel UI**: the timeline is rebuilt from persisted messages + operations after every run (live
+    SSE items are only shown while streaming), so reload/reconnect shows the same cards, and Undo/Confirm
+    buttons always reflect the operation's current status. One session per estimate is auto-created, titled
+    after the uploaded files; the panel auto-opens after generation and toggles with Ctrl/⌘+J. The legacy
+    proposal card remains only for "answer a clarifying question" in the Questions tab.
