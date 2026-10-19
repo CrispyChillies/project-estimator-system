@@ -1,7 +1,7 @@
 COMPOSE = docker compose
 BACKEND = $(COMPOSE) exec backend
 
-.PHONY: up down logs seed fetch-datasets warm-cache backtest test lint reset types e2e check-copy landing-shots lighthouse
+.PHONY: up down logs seed fetch-datasets warm-cache backtest test lint reset types e2e check-copy landing-shots lighthouse deploy-check admin-archive
 
 up: ## build and start everything (migrations run on backend start)
 	@test -f .env || cp .env.example .env
@@ -50,3 +50,9 @@ landing-shots: ## regenerate landing/help screenshots from the running product (
 
 lighthouse: ## Lighthouse scores for the landing page (production build, isolated stack)
 	scripts/lighthouse.sh
+
+deploy-check: ## smoke-test a deployment: make deploy-check URL=https://… (optional DEPLOY_CHECK_EMAIL/PASSWORD, DEPLOY_CHECK_AI=1)
+	node scripts/deploy_check.mjs $(URL)
+
+admin-archive: ## rebuild deploy/seed/admin_archive.sql.gz from the local dev database (credentials scrubbed)
+	scripts/make_admin_archive.sh

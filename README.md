@@ -9,15 +9,19 @@ editor or via an AI agent (reviewable diffs) → finalize → enter actuals → 
 "Why this number?" view (source quote, raw LLM samples, analogs, calibration factor and its evidence),
 and a backtest page measures whether learning actually helps.
 
-## Quickstart
+## Live
+
+* App: **https://project-calibrate.vercel.app** (frontend on Vercel; API + Postgres on Render — see
+  [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the runbook, reviewer access and `make deploy-check`).
+
+## Quickstart (local)
 
 ```bash
-cp .env.example .env        # LLM_MODE=replay works offline with the committed gpt-6-luna fixtures; fake = heuristics
+cp .env.example .env        # set ADMIN_EMAIL / ADMIN_PASSWORD / SESSION_SECRET; LLM_MODE=replay works offline
 make up                     # db + backend + frontend; migrations run on backend start
-make seed                   # idempotent demo history (20 synthetic delivered projects)
-open http://localhost:3000  # API docs: http://localhost:8000/docs
-make backtest               # CLI backtest (no LLM calls)
-make test                   # backend tests (inside the backend container)
+open http://localhost:3000  # sign in with ADMIN_EMAIL / ADMIN_PASSWORD; API docs: http://localhost:8000/docs
+make test                   # backend tests + copy check
+make e2e                    # Playwright on an isolated stack (calibr_e2e database, fake LLM, $0)
 ```
 
 Then follow [docs/DEMO.md](docs/DEMO.md). Live-model validation, spend and the model choice:
@@ -57,21 +61,24 @@ Full math and hyperparameters: [docs/LEARNING.md](docs/LEARNING.md).
 
 ## Screenshots
 
-Captured by the Playwright suite (`frontend/e2e`, backend in `LLM_MODE=replay`; data is synthetic).
+Captured from the running product by `make landing-shots` (Playwright, live model, scratch copy of the
+reference dataset). Screenshots show fictional sample data.
 
 | | |
 |---|---|
-| ![Projects](docs/screenshots/projects.png) | ![Estimate editor](docs/screenshots/estimate.png) |
-| ![Agent with proposal](docs/screenshots/agent.png) | ![Why this number?](docs/screenshots/why-this-number.png) |
-| ![Actuals](docs/screenshots/actuals.png) | ![Insights](docs/screenshots/insights.png) |
-| ![Backtest](docs/screenshots/backtest.png) | ![Settings](docs/screenshots/settings.png) |
+| ![Agent](frontend/public/help/agent.png) | ![Why this number?](frontend/public/help/why.png) |
+| ![Projects](frontend/public/help/projects.png) | ![Insights](frontend/public/help/insights.png) |
 
 ## Privacy & security notes
 
 * In `live`/`record` mode client documents are sent to OpenAI. `LLM_REDACT_PII` is a documented stub
   (off) — redaction is future work.
 * Uploads: 15 MB limit, extension allowlist (PDF/DOCX/MD/TXT). Document text is never logged at INFO.
-* Demo-only identity via `X-User-Id`; there is no real authentication.
+* Accounts: argon2id passwords, opaque HttpOnly/Secure/SameSite=Lax session cookies, double-submit CSRF,
+  login throttling, per-endpoint authorization (projects are private unless shared). Sign-up is
+  open / invite-only / closed (`SIGNUP_MODE`).
+* The model is fixed by the operator; users cannot change it. Spend is capped globally (`LLM_BUDGET_USD`)
+  and per user per day (`USER_DAILY_USD_CAP`), with hourly request and concurrency limits.
 
 ## Repository layout
 

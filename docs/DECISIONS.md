@@ -191,3 +191,24 @@ Short log of choices made where the brief was ambiguous or reality forced a devi
 60. **Accessibility** is checked with axe-core in E2E (`e2e/a11y.spec.ts`, WCAG 2.1 A/AA, light + dark, public and
     app pages). Fixes: status/accuracy colours raised to 700/400 shades, labelled select triggers, accessible names
     that match visible text.
+61. **Hosting split: Vercel (frontend) + Render (API + Postgres).** Render runs the Docker image and offers
+    Postgres with pgvector (`CREATE EXTENSION vector`, verified in Render's extension list) in one Blueprint
+    (`render.yaml`). Vercel's `/api/*` rewrite keeps the API same-site, so cookies stay first-party and CORS is
+    not needed. Hosted `postgres://`/`postgresql://` URLs are normalised to the psycopg driver in config.
+62. **Production image** `deploy/backend.Dockerfile` (repo-root context, non-root user, no dev dependencies):
+    `alembic upgrade head` → idempotent archive seed → a single uvicorn worker on `$PORT` with proxy headers. One
+    worker on purpose: the per-user rate limiter and run locks are in-process (KNOWN_ISSUES #2). Migrations run
+    in the start command so the same image works on any plan without relying on a pre-deploy hook.
+63. **Admin archive seed.** `deploy/seed/admin_archive.sql.gz` (5.1 MB, not committed) is a data-only, column-explicit dump
+    of a scratch copy of the dev database with password hashes removed and sessions/login attempts/reset
+    tokens/jobs excluded. It is loaded only into a database without projects; the archive owner is renamed to
+    `ADMIN_EMAIL`. Because the GitHub repository is public and the dump holds the owner's test projects, it is
+    gitignored and loaded from the owner's machine with `scripts/restore_admin_archive.sh` (verified twice on a
+    scratch DB: seeded, then "skipped"). The estimates self-reference FK is dropped and re-created around the load (rows are not
+    parent-first in a data-only dump). Rehearsal: production image → empty Postgres → seeded 29 tables (28
+    projects, 581 tasks, 5 users) → restart logged "skipped" → production Next build proxied to it →
+    `make deploy-check` with sign-in and a live estimate + agent run: 21 passed, 0 failed (SSE first chunk 23 ms,
+    not compressed).
+64. **Vercel project** `project-calibrate` (the requested `calibrate.vercel.app` belongs to another account).
+    `BACKEND_URL=https://project-calibrate-api.onrender.com` and `PUBLIC_APP_URL` are set for Production;
+    `ROBOTS_INDEX` stays off until the owner decides to allow indexing.
