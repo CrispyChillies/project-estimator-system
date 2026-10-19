@@ -9,7 +9,7 @@ export function LogoMark({ className, title = "Calibr" }: { className?: string; 
         className="stroke-primary-foreground/45" />
       <path d="M9.6 14.4l1.5 1.2M16 11.4v1.9M22.4 14.4l-1.5 1.2" strokeWidth="2" strokeLinecap="round"
         className="stroke-primary-foreground" />
-      <path d="M16 20.5l4.6-5.2" strokeWidth="2.6" strokeLinecap="round" className="stroke-primary-foreground" />
+      <path d="M16 20.5l3.4-4.6" strokeWidth="2.6" strokeLinecap="round" className="stroke-primary-foreground" />
       <circle cx="16" cy="20.5" r="2.2" className="fill-primary-foreground" />
     </svg>
   );

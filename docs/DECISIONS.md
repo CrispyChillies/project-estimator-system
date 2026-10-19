@@ -175,3 +175,19 @@ Short log of choices made where the brief was ambiguous or reality forced a devi
     yet" instead of misleading numbers. Unplanned work gained a `reason` (migration 0005, existing rows
     "unspecified"). Chart definitions live in one file (`frontend/src/lib/chart-guides.ts`) used by both the
     in-app drawers and `/help/analytics`.
+57. **Landing page and brand.** Logo "Calibr — Project Calibrate UI" is an original SVG gauge (light/dark), favicon
+    and PNG icons generated from it; all scaffold/third-party logos removed. Every landing screenshot is captured
+    from the running product by `make landing-shots` (Playwright, 1440×900 @2x, light + dark) on a scratch copy
+    of the pre-Prompt-5 backup (`calibr_shots`) that keeps only the fictional reference dataset and uses the live
+    model (cost a few cents). The footnote "Screenshots show fictional sample data." is shown under the hero, after
+    the features and in the footer. No testimonials, customer logos or performance claims.
+58. **Compression back on.** `compress: false` (Prompt 5 P3 hardening) made pages ~6× larger and pushed mobile LCP
+    to 8.2 s. Verified with `frontend/scripts/sse_check.mjs` that the agent SSE response stays uncompressed and
+    unbuffered through the production Next server (`Cache-Control: no-transform` is honoured): first chunk 30 ms,
+    99 events, `content-encoding: none`. Mobile Lighthouse went 72 → 94.
+59. **Anonymous visitors** no longer trigger a 401 on public pages: `GET /auth/session` returns `{user: null}`;
+    signed-in visitors to `/` are redirected to `/dashboard` by `src/proxy.ts` (optimistic cookie check; the app
+    layout still verifies the session).
+60. **Accessibility** is checked with axe-core in E2E (`e2e/a11y.spec.ts`, WCAG 2.1 A/AA, light + dark, public and
+    app pages). Fixes: status/accuracy colours raised to 700/400 shades, labelled select triggers, accessible names
+    that match visible text.

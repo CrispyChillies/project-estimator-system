@@ -11,7 +11,7 @@ export function AuthCard({ title, description, children, footer }: {
 }) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted/30 p-4">
-      <Link href="/" aria-label="Calibr home">
+      <Link href="/">
         <Wordmark descriptor />
       </Link>
       <Card className="w-full max-w-sm">

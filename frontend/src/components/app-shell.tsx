@@ -68,11 +68,11 @@ function UserMenu() {
   if (!me) return null;
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="gap-2" aria-label="Account menu" data-tour="account-menu" />}>
-        <span className="flex size-6 items-center justify-center rounded-full bg-primary/15 text-xs font-medium text-primary">
+      <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="gap-2" title="Account menu" data-tour="account-menu" />}>
+        <span aria-hidden className="flex size-6 items-center justify-center rounded-full bg-primary/15 text-xs font-medium text-primary">
           {me.name.slice(0, 1).toUpperCase()}
         </span>
-        <span className="hidden max-w-32 truncate sm:inline">{me.name}</span>
+        <span className="sr-only max-w-32 truncate sm:not-sr-only">{me.name}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <div className="px-2 py-1.5 text-xs text-muted-foreground">{me.role === "admin" ? "Administrator" : "Member"}</div>

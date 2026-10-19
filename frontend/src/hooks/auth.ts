@@ -32,6 +32,16 @@ export function useMe() {
   });
 }
 
+/** Public pages: who is signed in, without a 401 for anonymous visitors. */
+export function useSessionUser() {
+  return useQuery({
+    queryKey: ["session"],
+    queryFn: async () => (await api<{ user: Me | null }>("/auth/session")).user,
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
 export function useSignOut() {
   const qc = useQueryClient();
   return useMutation({

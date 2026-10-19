@@ -131,6 +131,13 @@ def me(user: User = Depends(A.current_user)) -> dict:
     return me_out(user)
 
 
+@router.get("/session")
+def session_status(request: Request, db: Session = Depends(get_db)) -> dict:
+    """For public pages: 200 either way, so anonymous visitors do not produce 401 noise."""
+    found = A.session_from_request(db, request)
+    return {"user": me_out(found[1]) if found else None}
+
+
 @router.patch("/me")
 def update_me(body: ProfileIn, user: User = Depends(A.current_user), db: Session = Depends(get_db)) -> dict:
     u = db.get(User, user.id)

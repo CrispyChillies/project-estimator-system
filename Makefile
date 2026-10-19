@@ -1,7 +1,7 @@
 COMPOSE = docker compose
 BACKEND = $(COMPOSE) exec backend
 
-.PHONY: up down logs seed fetch-datasets warm-cache backtest test lint reset types e2e check-copy
+.PHONY: up down logs seed fetch-datasets warm-cache backtest test lint reset types e2e check-copy landing-shots lighthouse
 
 up: ## build and start everything (migrations run on backend start)
 	@test -f .env || cp .env.example .env
@@ -44,3 +44,9 @@ reset: ## disabled: data must be preserved (see docs/DATA_INVENTORY.md)
 
 check-copy: ## fail on demo/sample wording in user-facing text
 	node scripts/check_no_demo_strings.mjs
+
+landing-shots: ## regenerate landing/help screenshots from the running product (isolated stack)
+	scripts/landing_shots.sh
+
+lighthouse: ## Lighthouse scores for the landing page (production build, isolated stack)
+	scripts/lighthouse.sh

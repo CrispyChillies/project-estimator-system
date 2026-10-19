@@ -86,7 +86,7 @@ function MetricsTable({ summary, level }: { summary: BacktestSummary; level: "ta
               const ci = row.r?.[`${level}_ci`]?.[m.key];
               const isBest = best(vals, m.better) === i;
               return (
-                <TableCell key={m.key} className={cn("text-right tabular-nums", isBest && "font-semibold text-emerald-600")}>
+                <TableCell key={m.key} className={cn("text-right tabular-nums", isBest && "font-semibold text-emerald-700 dark:text-emerald-400")}>
                   {m.fmt(vals[i])}
                   {m.ci && ci && (
                     <div className="text-[10px] font-normal text-muted-foreground">
@@ -144,7 +144,7 @@ export default function BacktestPage() {
         actions={
           <>
             <Select value={protocol} onValueChange={(v) => setProtocol(String(v))} items={[{ value: "loo", label: "Leave-one-out" }, { value: "chronological", label: "Chronological" }]}>
-              <SelectTrigger size="sm" className="w-40">
+              <SelectTrigger size="sm" className="w-40" aria-label="Backtest protocol">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -171,7 +171,7 @@ export default function BacktestPage() {
               onValueChange={(v) => v && setRunId(v)}
               items={runs.map((r) => ({ value: r.id, label: `${dateTime(r.created_at)} · ${String(r.config.protocol)}` }))}
             >
-              <SelectTrigger size="sm" className="w-72">
+              <SelectTrigger size="sm" className="w-72" aria-label="Backtest run">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -281,7 +281,7 @@ export default function BacktestPage() {
                             {r ? (
                               <>
                                 {hours(r.p50)}
-                                <div className={cn("text-[10px]", r.ape <= 0.1 ? "text-emerald-600" : r.ape <= 0.25 ? "text-amber-600" : "text-rose-600")}>
+                                <div className={cn("text-[10px]", r.ape <= 0.1 ? "text-emerald-700 dark:text-emerald-400" : r.ape <= 0.25 ? "text-amber-700 dark:text-amber-400" : "text-rose-700 dark:text-rose-400")}>
                                   {pct(r.ape)} {r.covered_p80 ? "✓P80" : ""}
                                 </div>
                               </>

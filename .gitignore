@@ -14,3 +14,4 @@ frontend/playwright-report/
 .DS_Store
 backups/
 frontend/.next-e2e/
+frontend/.vercel/

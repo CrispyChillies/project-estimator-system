@@ -41,7 +41,7 @@ export type Highlight = Record<string, "update" | "remove" | "agent">;
 
 const CONF: Record<string, string> = {
   low: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
-  medium: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  medium: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
   high: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
 };
 
@@ -192,7 +192,7 @@ function TaskRow({
             onValueChange={(v) => v && patch.mutate({ id: task.id, patch: { category_id: v } })}
             items={categories.map((c) => ({ value: c.id, label: c.name }))}
           >
-            <SelectTrigger size="sm" className="h-7 w-40">
+            <SelectTrigger size="sm" className="h-7 w-40" aria-label={`Category: ${task.title}`}>
               <SelectValue placeholder="—" />
             </SelectTrigger>
             <SelectContent>
@@ -211,7 +211,7 @@ function TaskRow({
             onValueChange={(v) => v && patch.mutate({ id: task.id, patch: { delivery_role_id: v } })}
             items={roles.map((r) => ({ value: r.id, label: r.name }))}
           >
-            <SelectTrigger size="sm" className="h-7 w-32">
+            <SelectTrigger size="sm" className="h-7 w-32" aria-label={`Role: ${task.title}`}>
               <SelectValue placeholder="—" />
             </SelectTrigger>
             <SelectContent>
@@ -236,7 +236,7 @@ function TaskRow({
         </TableCell>
         <TableCell>
           {task.delta_pct !== null && task.delta_pct !== undefined ? (
-            <Badge variant="outline" className={task.delta_pct > 0 ? "text-amber-600" : "text-sky-600"}>
+            <Badge variant="outline" className={task.delta_pct > 0 ? "text-amber-700 dark:text-amber-400" : "text-sky-700 dark:text-sky-400"}>
               {task.delta_pct > 0 ? "+" : ""}
               {task.delta_pct.toFixed(0)}%
             </Badge>

@@ -20,10 +20,10 @@ function OpDiff({ op }: { op: ProposalOp }) {
           <li key={c.task_id} className="flex justify-between gap-2">
             <span className="truncate">{c.title}</span>
             <span className="shrink-0 tabular-nums">
-              <span className="text-rose-600 line-through">
+              <span className="text-rose-700 dark:text-rose-400 line-through">
                 {c.old_min}–{c.old_max}
               </span>{" "}
-              <span className="text-emerald-600">
+              <span className="text-emerald-700 dark:text-emerald-400">
                 {c.new_min}–{c.new_max}
               </span>
             </span>
@@ -35,18 +35,18 @@ function OpDiff({ op }: { op: ProposalOp }) {
   }
   if (op.type === "add_task")
     return (
-      <div className="mt-1 text-xs text-emerald-600">
+      <div className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
         + {p.title} ({p.min_hours}–{p.max_hours} h)
       </div>
     );
-  if (op.type === "remove_task") return <div className="mt-1 text-xs text-rose-600 line-through">− {p.title}</div>;
+  if (op.type === "remove_task") return <div className="mt-1 text-xs text-rose-700 dark:text-rose-400 line-through">− {p.title}</div>;
   if (op.type === "update_task" && p.before)
     return (
       <div className="mt-1 text-xs">
-        <span className="text-rose-600 line-through">
+        <span className="text-rose-700 dark:text-rose-400 line-through">
           {p.before.min_hours}–{p.before.max_hours} h
         </span>{" "}
-        <span className="text-emerald-600">{JSON.stringify(p.changes)}</span>
+        <span className="text-emerald-700 dark:text-emerald-400">{JSON.stringify(p.changes)}</span>
       </div>
     );
   return null;

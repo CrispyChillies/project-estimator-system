@@ -4,14 +4,14 @@ import Link from "next/link";
 
 import { Wordmark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
-import { useMe } from "@/hooks/auth";
+import { useSessionUser } from "@/hooks/auth";
 
 export function PublicHeader({ links = true }: { links?: boolean }) {
-  const { data: me } = useMe();
+  const { data: me } = useSessionUser();
   return (
     <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
       <nav className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4" aria-label="Main">
-        <Link href="/" aria-label="Calibr — Project Calibrate UI, home">
+        <Link href="/">
           <Wordmark descriptor />
         </Link>
         {links && (

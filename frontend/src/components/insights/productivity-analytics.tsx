@@ -75,7 +75,7 @@ function HowToRead({ id }: { id: ChartGuideId }) {
   const g = CHART_GUIDES[id];
   return (
     <Sheet>
-      <SheetTrigger render={<Button size="xs" variant="ghost" aria-label={`How to read: ${g.title}`} />}>
+      <SheetTrigger render={<Button size="xs" variant="ghost" aria-label={`How to read this: ${g.title}`} />}>
         <BookOpen /> How to read this
       </SheetTrigger>
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">

@@ -19,6 +19,8 @@ const ALLOW_FILES = [
   "frontend/src/app/(app)/admin/page.tsx",
   "frontend/src/components/admin/",
 ];
+// The mandated screenshot disclosure is the one place "sample data" must appear.
+const ALLOW_TEXT = /Screenshots show fictional sample data\./g;
 // Literals that are code, not copy.
 const CODE_LIKE = /^[\w./@:-]+$|placeholder:|^[a-z0-9-]+(\s+[a-z0-9:/[\]().%-]+)+$/;
 
@@ -42,7 +44,8 @@ for (const file of walk(SRC, [".ts", ".tsx"])) {
     const literals = [...line.matchAll(/"([^"]*)"|'([^']*)'|`([^`]*)`/g)].map((m) => m[1] ?? m[2] ?? m[3]);
     const jsxText = [...line.matchAll(/>([^<>{}]+)</g)].map((m) => m[1]);
     const bare = /^\s*[A-Za-z][^=<>{}();]*$/.test(line) && !/[;{}]$/.test(line.trim()) ? [line.trim()] : [];
-    for (const text of [...literals, ...jsxText, ...bare]) {
+    for (const raw of [...literals, ...jsxText, ...bare]) {
+      const text = raw?.replace(ALLOW_TEXT, "");
       if (!text || CODE_LIKE.test(text.trim())) continue;
       if (PATTERN.test(text)) findings.push(`${rel}:${i + 1}: ${text.trim().slice(0, 120)}`);
     }
@@ -54,7 +57,8 @@ for (const file of walk(BUILD, [".html"])) {
     .readFileSync(file, "utf8")
     .replace(/<script[\s\S]*?<\/script>/g, " ")
     .replace(/<style[\s\S]*?<\/style>/g, " ")
-    .replace(/<[^>]+>/g, " ");
+    .replace(/<[^>]+>/g, " ")
+    .replace(ALLOW_TEXT, " ");
   const m = text.match(new RegExp(`.{0,40}${PATTERN.source}.{0,40}`, "i"));
   if (m && !rel.includes("admin")) findings.push(`${rel}: ${m[0].trim()}`);
 }

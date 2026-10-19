@@ -82,7 +82,7 @@ function CompareView({ estimateId, other, estimates }: { estimateId: string; oth
                 <TableCell>{r.title}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{r.category}</TableCell>
                 <TableCell className="text-right tabular-nums">{ma !== null ? `${r.a_min}–${r.a_max}` : "—"}</TableCell>
-                <TableCell className={`text-right tabular-nums ${up ? "text-amber-600" : down ? "text-sky-600" : ""}`}>
+                <TableCell className={`text-right tabular-nums ${up ? "text-amber-700 dark:text-amber-400" : down ? "text-sky-700 dark:text-sky-400" : ""}`}>
                   {mb !== null ? `${r.b_min}–${r.b_max}` : "—"}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{factor(r.factor)}</TableCell>
@@ -241,7 +241,7 @@ export function EstimateTab({
         onValueChange={(v) => v && onSelect(v)}
         items={estimates.map((e) => ({ value: e.id, label: label(e) }))}
       >
-        <SelectTrigger size="sm" className="w-60">
+        <SelectTrigger size="sm" className="w-60" aria-label="Estimate version">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -261,7 +261,7 @@ export function EstimateTab({
         onValueChange={(v) => setCompareWith(v && v !== "none" ? v : null)}
         items={[{ value: "none", label: "No comparison" }, ...others.map((e) => ({ value: e.id, label: `Compare with ${label(e)}` }))]}
       >
-        <SelectTrigger size="sm" className="w-64">
+        <SelectTrigger size="sm" className="w-64" aria-label="Compare with">
           <GitCompare className="size-4" />
           <SelectValue />
         </SelectTrigger>

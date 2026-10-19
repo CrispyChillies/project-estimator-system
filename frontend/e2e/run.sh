@@ -18,9 +18,9 @@ with SessionLocal() as db:  # create/reset the e2e admin for this run (e2e datab
     email = os.environ["E2E_ADMIN_EMAIL"]
     u = db.query(User).filter(User.email == email).first()
     if u is None:
-        u = User(name="E2E Admin", email=email, role="admin", onboarding_state={"tour_done": True, "welcome_seen": True})
+        u = User(name=os.environ.get("E2E_ADMIN_NAME", "E2E Admin"), email=email, role="admin", onboarding_state={"tour_done": True, "welcome_seen": True})
         db.add(u)
-    u.password_hash = hash_password(os.environ["E2E_ADMIN_PASSWORD"]); u.is_active = True; u.role = "admin"; u.archived = False
+    u.name = os.environ.get("E2E_ADMIN_NAME", "E2E Admin"); u.password_hash = hash_password(os.environ["E2E_ADMIN_PASSWORD"]); u.is_active = True; u.role = "admin"; u.archived = False
     db.flush()
     db.query(AuthSession).filter(AuthSession.user_id == u.id).delete()
     db.commit()
@@ -30,8 +30,15 @@ PY
   MAX_CONCURRENT_RUNS_PER_USER=5 ADMIN_EMAIL="$E2E_ADMIN_EMAIL" ADMIN_PASSWORD="$E2E_ADMIN_PASSWORD" \
   uv run uvicorn app.main:app --port 8010 >/tmp/calibr-e2e-backend.log 2>&1) &
 BACK=$!
-(cd frontend && NEXT_DIST_DIR=.next-e2e BACKEND_URL=http://localhost:8010 pnpm exec next dev --port 3005 >/tmp/calibr-e2e-frontend.log 2>&1) &
+if [ "${E2E_FRONTEND:-dev}" = prod ]; then  # production build (no dev overlay), used for screenshots/Lighthouse
+  (cd frontend && NEXT_DIST_DIR=.next-e2e BACKEND_URL=http://localhost:8010 pnpm exec next build >/tmp/calibr-e2e-build.log 2>&1)
+  (cd frontend && NEXT_DIST_DIR=.next-e2e BACKEND_URL=http://localhost:8010 pnpm exec next start --port 3005 >/tmp/calibr-e2e-frontend.log 2>&1) &
+else
+  (cd frontend && NEXT_DIST_DIR=.next-e2e BACKEND_URL=http://localhost:8010 pnpm exec next dev --port 3005 >/tmp/calibr-e2e-frontend.log 2>&1) &
+fi
 FRONT=$!
-trap 'kill $BACK $FRONT 2>/dev/null; pkill -f "uvicorn app.main:app --port 8010"; pkill -f "next dev --port 3005"; true' EXIT
+trap 'kill $BACK $FRONT 2>/dev/null; pkill -f "uvicorn app.main:app --port 8010"; pkill -f "next (dev|start) --port 3005"; true' EXIT
 for i in $(seq 1 60); do curl -sf localhost:8010/api/v1/health >/dev/null && curl -sf localhost:3005/signin >/dev/null && break; sleep 1; done
-cd frontend && E2E_BASE_URL=http://localhost:3005 pnpm exec playwright test "$@"
+cd frontend
+export E2E_BASE_URL=http://localhost:3005
+if [ -n "${STACK_CMD:-}" ]; then eval "$STACK_CMD"; else pnpm exec playwright test "$@"; fi

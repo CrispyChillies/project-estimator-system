@@ -115,7 +115,7 @@ export function AddTaskDialog({
                 onValueChange={(v) => v && setModuleId(v)}
                 items={[...live.map((m) => ({ value: m.id, label: m.name })), { value: NEW_MODULE, label: "New module…" }]}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label="Module">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -138,7 +138,7 @@ export function AddTaskDialog({
                 onValueChange={(v) => v && setRoleId(v)}
                 items={[{ value: AUTO, label: "Auto" }, ...roles.map((r) => ({ value: r.id, label: r.name }))]}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label="Role">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -159,7 +159,7 @@ export function AddTaskDialog({
               onValueChange={(v) => v && setCategoryId(v)}
               items={[{ value: AUTO, label: "Auto" }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
             >
-              <SelectTrigger>
+              <SelectTrigger aria-label="Category">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

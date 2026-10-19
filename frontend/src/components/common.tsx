@@ -21,7 +21,7 @@ export function PageHeader({ title, description, actions }: { title: string; des
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
+  draft: "bg-muted text-foreground/80",
   quoted: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
   won: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   lost: "bg-rose-500/15 text-rose-700 dark:text-rose-300",

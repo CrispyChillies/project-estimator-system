@@ -61,6 +61,15 @@ def test_unauthenticated_requests_get_401(db):
         assert c.get("/api/v1/projects").status_code == 401
         assert c.get(f"/api/v1/estimates/{uuid.uuid4()}").status_code == 401
         assert c.get("/api/v1/health").status_code == 200
+        assert c.get("/api/v1/auth/session").json() == {"user": None}
+
+
+def test_session_status_reports_signed_in_user(db):
+    _user(db, "s@example.com")
+    c = _client("s@example.com")
+    assert c.get("/api/v1/auth/session").json()["user"]["email"] == "s@example.com"
+    c.post("/api/v1/auth/logout", headers=_h(c))
+    assert c.get("/api/v1/auth/session").json() == {"user": None}
 
 
 def test_member_cannot_touch_another_members_data(db, two_members):

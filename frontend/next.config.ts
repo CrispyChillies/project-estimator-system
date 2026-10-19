@@ -21,8 +21,9 @@ const nextConfig: NextConfig = {
   // A separate build dir lets the isolated E2E server run next to a developer's own dev server.
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   poweredByHeader: false,
-  // SSE through the rewrite proxy must not be buffered by response compression.
-  compress: false,
+  // Compression stays on for pages/assets; the agent's SSE responses carry `Cache-Control: no-transform`,
+  // which the compression layer honours, so the stream is passed through unbuffered (verified, DECISIONS.md).
+  compress: true,
   turbopack: {
     rules: {
       "*.css": {

@@ -41,7 +41,7 @@ const columns = helper.columns([
     cell: (c) => {
       const v = c.getValue();
       if (v === null || v === undefined) return "—";
-      const cls = v >= 85 ? "text-emerald-600" : v >= 70 ? "text-amber-600" : "text-rose-600";
+      const cls = v >= 85 ? "text-emerald-700 dark:text-emerald-400" : v >= 70 ? "text-amber-700 dark:text-amber-400" : "text-rose-700 dark:text-rose-400";
       return <span className={cls}>{v.toFixed(0)}%</span>;
     },
   }),
@@ -103,7 +103,7 @@ export default function ProjectsPage() {
           onValueChange={(v) => setStatus(v ?? "all")}
           items={STATUSES.map((s) => ({ value: s, label: s === "all" ? "All statuses" : s }))}
         >
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-40" aria-label="Filter by status">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

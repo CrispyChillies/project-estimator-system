@@ -184,7 +184,7 @@ function ToolCard({
           {raw && <pre className="mt-1 max-h-40 overflow-auto rounded bg-muted p-1.5 text-[10px]">{JSON.stringify(callArgs, null, 2)}</pre>}
         </div>
       )}
-      {text && <div className={cn("mt-1", entry && !entry.ok && "text-rose-600")}>{text}</div>}
+      {text && <div className={cn("mt-1", entry && !entry.ok && "text-rose-700 dark:text-rose-400")}>{text}</div>}
       {before && after && (
         <div className="mt-1 tabular-nums text-muted-foreground">
           Total {range(before)} → <span className="font-medium text-foreground">{range(after)}</span>

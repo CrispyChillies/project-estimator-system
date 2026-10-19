@@ -30,9 +30,9 @@ import type { Estimate, Project } from "@/lib/types";
 
 function variance(min: number, max: number, actual: number | null) {
   if (actual === null) return "";
-  if (actual > max) return "text-rose-600";
-  if (actual < min) return "text-sky-600";
-  return "text-emerald-600";
+  if (actual > max) return "text-rose-700 dark:text-rose-400";
+  if (actual < min) return "text-sky-700 dark:text-sky-400";
+  return "text-emerald-700 dark:text-emerald-400";
 }
 
 const REASON_LABEL: Record<string, string> = {
