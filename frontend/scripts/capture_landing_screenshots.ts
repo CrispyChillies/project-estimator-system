@@ -99,7 +99,7 @@ async function main() {
         await page.waitForTimeout(500);
       }
     }
-    const chatLog = page.locator("[data-slot=scroll-area-viewport]", { has: page.getByText("/similar", { exact: true }) });
+    const chatLog = page.getByTestId("chat-log");
     await shot("agent-refs", ["webp"]);
     await chatLog.evaluate((el) => (el.scrollTop = el.scrollHeight));
     await page.getByTestId("tool-card").last().evaluate((el) => el.scrollIntoView({ block: "end" }));

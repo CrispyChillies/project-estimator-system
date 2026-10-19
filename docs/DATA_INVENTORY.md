@@ -64,3 +64,46 @@ identical in count (projects 28, estimates 28, tasks 581, task_actuals 454, edit
 
 The deployment copy of this data is `deploy/seed/admin_archive.sql.gz` (built from a scratch copy, password
 hashes removed, not committed) — see [DEPLOYMENT.md](DEPLOYMENT.md#the-admin-archive-your-existing-test-data).
+
+## Prompt 6: pre-prompt6 vs final6 (local dev DB)
+
+Backup: backups/calibr-pre-prompt6-20261020-013913.dump. Migration 0006 is additive. No row lost.
+
+| table | before | after | status |
+|---|---:|---:|---|
+| agent_messages | 10 | 10 | ok |
+| agent_operations | 2 | 2 | ok |
+| agent_sessions | 6 | 6 | ok |
+| alembic_version | 1 | 1 | ok |
+| assumptions | 148 | 148 | ok |
+| backtest_results | 8988 | 8988 | ok |
+| backtest_runs | 4 | 4 | ok |
+| calibration_runs | 64 | 64 | ok |
+| calibration_stats | 63 | 63 | ok |
+| change_proposals | 2 | 2 | ok |
+| clarifying_questions | 29 | 29 | ok |
+| delivery_roles | 9 | 9 | ok |
+| document_chunks | 27 | 27 | ok |
+| documents | 27 | 27 | ok |
+| edit_events | 377 | 377 | ok |
+| estimates | 28 | 28 | ok |
+| jobs | 12 | 12 | ok |
+| learned_rules | 5 | 5 | ok |
+| llm_calls | 159 | 159 | ok |
+| llm_raw_estimates | 1722 | 1722 | ok |
+| login_attempts | 0 | 0 | ok |
+| modules | 220 | 220 | ok |
+| password_resets | 0 | 0 | ok |
+| project_embeddings | 24 | 24 | ok |
+| project_members | 0 | 0 | ok |
+| project_memories | 0 | 0 | ok |
+| projects | 28 | 28 | ok |
+| retrieval_logs | 1 | 1 | ok |
+| sessions | 0 | 0 | ok |
+| settings | 2 | 2 | ok |
+| task_actuals | 454 | 454 | ok |
+| task_ai_baselines | 572 | 572 | ok |
+| task_categories | 16 | 16 | ok |
+| tasks | 581 | 581 | ok |
+| unplanned_actuals | 44 | 44 | ok |
+| users | 5 | 5 | ok |
