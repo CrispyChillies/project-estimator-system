@@ -96,3 +96,16 @@ Short log of choices made where the brief was ambiguous or reality forced a devi
     (detected by `tasks.row_version`) are skipped, giving a partial undo that is reported to the user.
 35. **Migration 0003** is idempotent (`create_all(checkfirst)` + `ADD COLUMN IF NOT EXISTS`) because 0001 builds
     the schema from current metadata.
+36. **Project retrieval keeps the learning partition**: `model_key` is NOT suffixed with `|ctx_k3`/`|noctx`,
+    because that would orphan every existing edit/actual record from calibration. The variant is stored
+    instead in `estimates.model_snapshot.retrieval.variant` and `task_ai_baselines.retrieval` so backtests
+    and reports can split by it.
+37. **Project cards are deterministic** (latest final estimate, edits vs AI baseline, actuals) and embedded
+    per `embedding_model|card-v1`, re-embedded only when the card hash changes. Score = cosine + 0.05·tag
+    Jaccard + 0.03 same domain + 0.05·category-share overlap (when known) + delivered boost; the
+    min-similarity threshold applies to raw cosine, then MMR (λ=0.7) over the top 10. Fewer than k is
+    returned rather than padding.
+38. **References are appended to the decomposition/estimation prompts only when non-empty**, so prompts
+    without references are byte-identical to before and existing replay fixtures still hit. In replay mode a
+    cache miss on a context prompt (or on a new card embedding) degrades to `noctx` and records the reason,
+    instead of failing offline demos.

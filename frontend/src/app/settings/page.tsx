@@ -67,7 +67,9 @@ function LearningCard() {
     mutationFn: () =>
       api("/settings/learning", {
         method: "PUT",
-        json: Object.fromEntries(Object.entries(draft).map(([k, v]) => [k, Number(v)])),
+        json: Object.fromEntries(
+          Object.entries(draft).map(([k, v]) => [k, v === "true" ? true : v === "false" ? false : Number(v)]),
+        ),
       }),
     onSuccess: () => {
       setDraft({});

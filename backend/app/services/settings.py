@@ -28,6 +28,14 @@ class LearningParams(BaseModel):
     raw_samples: int = Field(3, ge=1, le=9)
     max_active_rules: int = Field(10, ge=0, le=50)
     large_edit_threshold: float = Field(0.2, ge=0, description="Relative change that shows 'Why?' chips.")
+    retrieval_context_enabled: bool = Field(True, description="Inject similar past projects into prompts.")
+    retrieval_k: int = Field(3, ge=0, le=10, description="Similar past projects used as context.")
+    retrieval_min_similarity: float = Field(0.55, ge=0, le=1, description="Below this, return fewer (never pad).")
+    retrieval_include_synthetic: bool = Field(True, description="Allow synthetic projects as references.")
+    retrieval_mmr_lambda: float = Field(0.7, ge=0, le=1, description="Relevance vs diversity in re-ranking.")
+    retrieval_delivered_boost: float = Field(0.05, ge=0, le=0.5, description="Score bonus for delivered projects.")
+    retrieval_token_cap: int = Field(1500, ge=200, le=6000, description="Max tokens per reference context pack.")
+    analog_blend_enabled: bool = Field(True, description="Blend task-level analogs into calibrated hours.")
 
 
 DEFAULTS = LearningParams()

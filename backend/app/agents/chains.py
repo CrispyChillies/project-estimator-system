@@ -152,13 +152,14 @@ def fake_decomposition(ex: ExtractionResult) -> Decomposition:
     return Decomposition(modules=[*modules.values(), hidden])
 
 
-def run_decomposition(ex: ExtractionResult, categories: list[str], roles: list[str], rules: list[str]) -> Decomposition:
+def run_decomposition(ex: ExtractionResult, categories: list[str], roles: list[str], rules: list[str],
+                      references: str = "") -> Decomposition:
     prompt = render(
         "decomposition", categories=", ".join(categories), roles=", ".join(roles),
         requirements="\n".join(f"{r.id}: {r.text}" for r in ex.requirements),
         assumptions="; ".join(ex.assumptions) or "none", out_of_scope="; ".join(ex.out_of_scope) or "none",
         rules="\n".join(f"- {r}" for r in rules) or "none",
-    )
+    ) + references
     result = get_gateway().structured(
         "decomposition", [("system", "You decompose software projects."), ("user", prompt)], Decomposition,
         prompt_version=PROMPT_VERSIONS["decomposition"], fake=lambda: fake_decomposition(ex), temperature=0.1,
@@ -195,13 +196,14 @@ def fake_estimation(tasks: list[dict], sample_idx: int) -> EstimationResult:
     return EstimationResult(estimates=out)
 
 
-def run_estimation(tasks: list[dict], summary: str, rules: list[str], k: int) -> tuple[dict[str, tuple[float, float]], dict]:
+def run_estimation(tasks: list[dict], summary: str, rules: list[str], k: int,
+                   references: str = "") -> tuple[dict[str, tuple[float, float]], dict]:
     """Run K samples on a fixed task list; return per-task median (min, max) and all samples."""
     prompt = render(
         "estimation", summary=summary, rules="\n".join(f"- {r}" for r in rules) or "none",
         tasks="\n".join(f"{t['key']} | {t['role_name']} | {t['category_key']} | {t['title']} — {t['description']}"
                         for t in tasks),
-    )
+    ) + references
     samples: dict[str, list[tuple[float, float]]] = {t["key"]: [] for t in tasks}
     for i in range(k):
         res = get_gateway().structured(

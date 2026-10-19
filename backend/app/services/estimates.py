@@ -270,6 +270,7 @@ def clone_estimate(db: Session, estimate_id: uuid.UUID, user_id: uuid.UUID | Non
                                   calibrated_min=b.calibrated_min, calibrated_max=b.calibrated_max,
                                   applied_factor=b.applied_factor, shown_min=b.shown_min, shown_max=b.shown_max,
                                   category_key=b.category_key, provenance=b.provenance,
-                                  prompt_version=b.prompt_version, model=b.model, model_key=b.model_key))
+                                  prompt_version=b.prompt_version, model=b.model, model_key=b.model_key,
+                                  retrieval=b.retrieval))
     db.flush()
     return est

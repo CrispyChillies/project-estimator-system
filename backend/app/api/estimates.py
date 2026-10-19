@@ -58,6 +58,31 @@ def get_summary(estimate_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     return s
 
 
+@router.get("/estimates/{estimate_id}/references")
+def get_references(estimate_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+    """References used when this estimate was generated (frozen in the snapshot)."""
+    snap = es.get_estimate(db, estimate_id).model_snapshot or {}
+    return {"retrieval": snap.get("retrieval"), "references": snap.get("reference_projects", [])}
+
+
+@router.get("/estimates/{estimate_id}/similar-projects")
+def similar_projects(estimate_id: uuid.UUID, k: int | None = Query(None, ge=0, le=10),
+                     db: Session = Depends(get_db)) -> dict:
+    """Live retrieval against the current state of the estimate (used by the agent and the References card)."""
+    from app.db.models import Project
+    from app.services import project_retrieval as pr
+    from app.services.settings import get_params
+
+    est = es.get_estimate(db, estimate_id)
+    project = db.get(Project, est.project_id)
+    card = pr.build_card(db, project, est)
+    refs, err = pr.safe_retrieve(db, pr.card_text(card), get_params(db), exclude_project_id=project.id,
+                                 tags=project.tech_tags, domain=project.domain, cat_share=card["category_share"],
+                                 k=k, estimate_id=est.id)
+    db.commit()
+    return {"references": [r.to_dict() for r in refs], "error": err}
+
+
 @router.get("/estimates/{estimate_id}/compare", response_model=S.CompareOut)
 def compare_estimates(estimate_id: uuid.UUID, with_: uuid.UUID = Query(alias="with"), db: Session = Depends(get_db)):
     return compare(db, with_, estimate_id)

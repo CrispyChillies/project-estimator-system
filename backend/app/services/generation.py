@@ -23,9 +23,10 @@ from app.db.models import (
     TaskAIBaseline,
     TaskCategory,
 )
-from app.llm.gateway import get_gateway
+from app.llm.gateway import LLMCacheMiss, get_gateway
 from app.prompts import PROMPT_VERSIONS
 from app.services import estimates as es
+from app.services import project_retrieval as pr
 from app.services.calibration import impact_score, mid, predict_task
 from app.services.learning import active_rules, load_stats
 from app.services.reference import category_maps, role_maps
@@ -45,7 +46,8 @@ def next_version(db: Session, project_id: uuid.UUID) -> int:
 
 
 def generate(db: Session, project_id: uuid.UUID, document_ids: list[uuid.UUID], learning: bool,
-             user_id: uuid.UUID | None, progress: Progress = _noop) -> Estimate:
+             user_id: uuid.UUID | None, progress: Progress = _noop, *,
+             eligible_project_ids: list[uuid.UUID] | None = None) -> Estimate:
     project = db.get(Project, project_id)
     if project is None:
         raise NotFound("Project")
@@ -71,8 +73,29 @@ def generate(db: Session, project_id: uuid.UUID, document_ids: list[uuid.UUID], 
     ex = chains.run_extraction([(k, c.text) for k, c in short.items()], categories, roles)
     req_chunks = {r.id: [short[c].id for c in r.source_chunk_ids if c in short] for r in ex.requirements}
 
+    progress(0.25, "Finding similar past projects")
+    refs: list[pr.Reference] = []
+    retrieval_error = None
+    if p.retrieval_context_enabled and p.retrieval_k > 0:
+        query = "\n".join([project.name, project.domain, ", ".join(project.tech_tags or []), project.description,
+                           ex.summary, *(r.text for r in ex.requirements)])
+        refs, retrieval_error = pr.safe_retrieve(db, query, p, exclude_project_id=project_id,
+                                                 eligible_project_ids=eligible_project_ids,
+                                                 tags=project.tech_tags, domain=project.domain)
+    block = pr.references_block(refs, p.retrieval_token_cap)
+
     progress(0.3, "Decomposing into modules and tasks")
-    deco = chains.run_decomposition(ex, categories, roles, rule_texts)
+    try:
+        deco = chains.run_decomposition(ex, categories, roles, rule_texts, block)
+    except LLMCacheMiss:
+        if not block:
+            raise
+        # Replay fixtures were recorded without references; degrade to no context rather than fail offline.
+        refs, block, retrieval_error = [], "", "replay_cache_miss"
+        deco = chains.run_decomposition(ex, categories, roles, rule_texts)
+    variant = f"ctx_k{p.retrieval_k}" if block else "noctx"
+    retrieval_meta = {"k": p.retrieval_k, "variant": variant, "pack_hash": pr.pack_hash(block) if block else None,
+                      "project_ids": [r.project_id for r in refs], "error": retrieval_error}
 
     est = Estimate(project_id=project_id, version=next_version(db, project_id), status="draft", source="ai",
                    learning_enabled=learning, created_by=user_id, model_key=gw.model_key,
@@ -80,7 +103,9 @@ def generate(db: Session, project_id: uuid.UUID, document_ids: list[uuid.UUID], 
                                    "llm_mode": gw.mode, "reasoning": gw.reasoning,
                                    "prompt_versions": PROMPT_VERSIONS, "params": p.model_dump(),
                                    "raw_samples": p.raw_samples, "summary": ex.summary,
-                                   "rules_active": [str(r.id) for r in rules]})
+                                   "rules_active": [str(r.id) for r in rules],
+                                   "retrieval": retrieval_meta,
+                                   "reference_projects": [r.to_dict() for r in refs]})
     db.add(est)
     db.flush()
     for kind, items in (("assumption", ex.assumptions + ex.ambiguities), ("risk", ex.risks),
@@ -90,7 +115,7 @@ def generate(db: Session, project_id: uuid.UUID, document_ids: list[uuid.UUID], 
 
     task_dicts = [{**t.model_dump(), "module": m.name} for m in deco.modules for t in m.tasks]
     progress(0.45, f"Estimating hours ({p.raw_samples} samples)")
-    raw, samples = chains.run_estimation(task_dicts, ex.summary, rule_texts, p.raw_samples)
+    raw, samples = chains.run_estimation(task_dicts, ex.summary, rule_texts, p.raw_samples, block)
     for key, ss in samples.items():
         for i, (lo, hi) in enumerate(ss):
             db.add(LLMRawEstimate(project_id=project_id, task_key=key, run_idx=i, model_key=gw.model_key,
@@ -109,8 +134,8 @@ def generate(db: Session, project_id: uuid.UUID, document_ids: list[uuid.UUID], 
         rmin, rmax = raw[td["key"]]
         analogs = find_analogs(db, vec, td["category_key"], exclude_project_id=project_id, top_k=p.analog_top_k) \
             if learning else []
-        pred = predict_task(rmin, rmax, td["category_key"], author, analogs, edit_stats, actual_stats, p,
-                            learning=learning)
+        pred = predict_task(rmin, rmax, td["category_key"], author, analogs if p.analog_blend_enabled else [],
+                            edit_stats, actual_stats, p, learning=learning)
         src = sorted({c for rid in td["requirement_ids"] for c in req_chunks.get(rid, [])}, key=str)
         task = es.create_task(db, est.id, {
             "module_id": modules[td["module"]], "title": td["title"], "description": td["description"],
@@ -127,6 +152,7 @@ def generate(db: Session, project_id: uuid.UUID, document_ids: list[uuid.UUID], 
             "calibration": pred.calibration.to_dict() if pred.calibration else None,
             "source_chunk_ids": [str(c) for c in src], "rules_applied": applied_rules,
             "learning": learning, "requirement_ids": td["requirement_ids"],
+            "reference_projects": [r.to_dict() for r in refs], "analog_blend": p.analog_blend_enabled,
         }
         db.add(TaskAIBaseline(
             task_id=task.id, estimate_id=est.id, ai_key=td["key"], raw_min=rmin, raw_max=rmax,
@@ -135,6 +161,7 @@ def generate(db: Session, project_id: uuid.UUID, document_ids: list[uuid.UUID], 
             applied_factor=pred.applied_factor, shown_min=pred.min_hours, shown_max=pred.max_hours,
             category_key=td["category_key"], provenance=provenance,
             prompt_version=PROMPT_VERSIONS["estimation"], model=gw.model, model_key=gw.model_key,
+            retrieval=retrieval_meta,
         ))
         by_key[td["key"]] = pred.applied_factor
 
