@@ -1,5 +1,6 @@
 "use client";
 
+import { CategoryTag, RoleTag } from "@/components/tags";
 import {
   DndContext,
   type DragEndEvent,
@@ -193,12 +194,12 @@ function TaskRow({
             items={categories.map((c) => ({ value: c.id, label: c.name }))}
           >
             <SelectTrigger size="sm" className="h-7 w-40" aria-label={`Category: ${task.title}`}>
-              <SelectValue placeholder="—" />
+              <SelectValue placeholder="—">{(v: string | null) => (v ? <CategoryTag id={v} /> : "—")}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {categories.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
-                  {c.name}
+                  <CategoryTag id={c.id} />
                 </SelectItem>
               ))}
             </SelectContent>
@@ -212,12 +213,12 @@ function TaskRow({
             items={roles.map((r) => ({ value: r.id, label: r.name }))}
           >
             <SelectTrigger size="sm" className="h-7 w-32" aria-label={`Role: ${task.title}`}>
-              <SelectValue placeholder="—" />
+              <SelectValue placeholder="—">{(v: string | null) => (v ? <RoleTag id={v} /> : "—")}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {roles.map((r) => (
                 <SelectItem key={r.id} value={r.id}>
-                  {r.name}
+                  <RoleTag id={r.id} />
                 </SelectItem>
               ))}
             </SelectContent>

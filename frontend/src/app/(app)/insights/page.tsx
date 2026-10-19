@@ -3,7 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, RefreshCw } from "lucide-react";
 import { useEffect, useMemo } from "react";
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
+import { CategoryTag, useTagHex } from "@/components/tags";
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 
 import { EmptyState, PageHeader } from "@/components/common";
@@ -39,8 +40,8 @@ import { date, factor, pct } from "@/lib/format";
 import type { Rule } from "@/lib/types";
 
 const layerConfig = {
-  edit: { label: "Edit layer (PM belief)", color: "var(--chart-1)" },
-  actual: { label: "Actual layer (delivered)", color: "var(--chart-2)" },
+  edit: { label: "Edit layer (PM belief) — lighter", color: "var(--muted-foreground)" },
+  actual: { label: "Actual layer (delivered) — solid", color: "var(--foreground)" },
 } satisfies ChartConfig;
 
 const LINE_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
@@ -129,6 +130,7 @@ function CalibrationView() {
   const { data: structural } = useStructural();
   const { data: categories } = useCategories();
   const catName = (k: string) => categories?.find((c) => c.key === k)?.name ?? k;
+  const tagHex = useTagHex();
 
   const factors = useMemo(() => {
     const rows: Record<string, { category: string; edit?: number; actual?: number; n_edit?: number; n_actual?: number }> = {};
@@ -205,8 +207,16 @@ function CalibrationView() {
                 <ReferenceLine y={1} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <ChartLegend content={<ChartLegendContent />} />
-                <Bar dataKey="edit" fill="var(--color-edit)" radius={2} />
-                <Bar dataKey="actual" fill="var(--color-actual)" radius={2} />
+                <Bar dataKey="edit" fill="var(--color-edit)" radius={2}>
+                  {factors.map((f) => (
+                    <Cell key={f.category} fill={tagHex.category(f.category)} fillOpacity={0.4} />
+                  ))}
+                </Bar>
+                <Bar dataKey="actual" fill="var(--color-actual)" radius={2}>
+                  {factors.map((f) => (
+                    <Cell key={f.category} fill={tagHex.category(f.category)} />
+                  ))}
+                </Bar>
               </BarChart>
             </ChartContainer>
           </CardContent>
@@ -311,7 +321,7 @@ function CalibrationView() {
                   .filter((r) => r.scope_type !== "category_author")
                   .map((r) => (
                     <TableRow key={`${r.layer}-${r.scope_type}-${r.scope_key}`}>
-                      <TableCell>{r.scope_type === "category" ? catName(r.scope_key) : `${r.scope_type}`}</TableCell>
+                      <TableCell>{r.scope_type === "category" ? <CategoryTag id={r.scope_key} /> : `${r.scope_type}`}</TableCell>
                       <TableCell>{r.layer}</TableCell>
                       <TableCell className="text-right tabular-nums">{r.n}</TableCell>
                       <TableCell className="text-right tabular-nums">{factor(r.factor)}</TableCell>
@@ -344,7 +354,9 @@ function CalibrationView() {
               <TableBody>
                 {structural?.categories.map((c) => (
                   <TableRow key={c.category}>
-                    <TableCell>{catName(c.category)}</TableCell>
+                    <TableCell>
+                      <CategoryTag id={c.category} />
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {pct(c.missing_task_rate)} <span className="text-xs text-muted-foreground">({c.added})</span>
                     </TableCell>

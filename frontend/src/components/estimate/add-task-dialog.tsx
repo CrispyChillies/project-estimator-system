@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useEstimateJobs } from "@/hooks/estimate-jobs";
 import { errorToast, useInvalidateEstimate } from "@/hooks/queries";
 import { api } from "@/lib/api";
+import { CategoryTag, RoleTag } from "@/components/tags";
 import type { Category, ModuleOut, Role, TaskOut } from "@/lib/types";
 
 const NEW_MODULE = "__new__";
@@ -139,13 +140,13 @@ export function AddTaskDialog({
                 items={[{ value: AUTO, label: "Auto" }, ...roles.map((r) => ({ value: r.id, label: r.name }))]}
               >
                 <SelectTrigger aria-label="Role">
-                  <SelectValue />
+                  <SelectValue>{(v: string | null) => (v && v !== AUTO ? <RoleTag id={v} /> : "Auto")}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={AUTO}>Auto</SelectItem>
                   {roles.map((r) => (
                     <SelectItem key={r.id} value={r.id}>
-                      {r.name}
+                      <RoleTag id={r.id} />
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -160,13 +161,13 @@ export function AddTaskDialog({
               items={[{ value: AUTO, label: "Auto" }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
             >
               <SelectTrigger aria-label="Category">
-                <SelectValue />
+                <SelectValue>{(v: string | null) => (v && v !== AUTO ? <CategoryTag id={v} /> : "Auto")}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={AUTO}>Auto</SelectItem>
                 {categories.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.name}
+                    <CategoryTag id={c.id} />
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -7,7 +7,11 @@ import { HelpTip } from "@/components/onboarding";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { hours, money } from "@/lib/format";
+import { FxNote } from "@/components/currency-toggle";
+import { RoleTag } from "@/components/tags";
+import { useCurrency } from "@/hooks/currency";
+import { hours } from "@/lib/format";
+import { formatMoney } from "@/lib/money";
 import type { EstimateSummary, Role } from "@/lib/types";
 
 const chartConfig = { count: { label: "Draws", color: "var(--chart-2)" } } satisfies ChartConfig;
@@ -31,9 +35,10 @@ export function Histogram({ summary, height = 140 }: { summary: EstimateSummary;
 }
 
 export function SummaryPanel({ summary, roles }: { summary?: EstimateSummary; roles: Role[] }) {
+  const { money, compact, currency, rate } = useCurrency();
+  void roles;
   if (!summary) return <Skeleton className="h-96 w-full" />;
   const sim = summary.simulation;
-  const color = (name: string) => roles.find((r) => r.name === name)?.color ?? "var(--muted-foreground)";
   return (
     <div className="space-y-3">
       <Card size="sm">
@@ -60,8 +65,17 @@ export function SummaryPanel({ summary, roles }: { summary?: EstimateSummary; ro
             P10 {hours(sim.p10)} · P90 {hours(sim.p90)} · Σ min–max {hours(summary.total_min)}–{hours(summary.total_max)}
           </div>
           <Histogram summary={summary} />
-          <div className="text-sm">
-            Cost (mid): <span className="font-medium">{money(summary.total_cost_mid, summary.currency)}</span>
+          <div className="space-y-0.5 text-sm" data-testid="cost-summary">
+            <div>
+              Cost (mid):{" "}
+              <span className="font-medium tabular-nums" title={formatMoney(summary.total_cost_mid, currency, rate)} data-testid="cost-mid">
+                {compact(summary.total_cost_mid)}
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground tabular-nums" data-testid="cost-range">
+              Range {compact(summary.total_cost_min)} – {compact(summary.total_cost_max)} (at max hours)
+            </div>
+            <FxNote />
           </div>
         </CardContent>
       </Card>
@@ -75,18 +89,19 @@ export function SummaryPanel({ summary, roles }: { summary?: EstimateSummary; ro
               <TableRow>
                 <TableHead>Role</TableHead>
                 <TableHead className="text-right">Hours</TableHead>
-                <TableHead className="text-right">Cost</TableHead>
+                <TableHead className="text-right">Cost (mid)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {summary.by_role.map((r) => (
                 <TableRow key={r.name}>
                   <TableCell>
-                    <span className="mr-1.5 inline-block size-2 rounded-full" style={{ background: color(r.name) }} />
-                    {r.name}
+                    <RoleTag id={r.role_id} name={r.name} />
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{hours(r.mid)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{money(r.cost, summary.currency)}</TableCell>
+                  <TableCell className="text-right tabular-nums" title={money(r.cost)}>
+                    {compact(r.cost)}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -102,9 +117,12 @@ export function SummaryPanel({ summary, roles }: { summary?: EstimateSummary; ro
             <TableBody>
               {summary.by_module.map((m) => (
                 <TableRow key={m.name}>
-                  <TableCell className="max-w-40 truncate">{m.name}</TableCell>
+                  <TableCell className="max-w-24 truncate" title={m.name}>{m.name}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {hours(m.min)}–{hours(m.max)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground" title={money(m.cost)}>
+                    {compact(m.cost)}
                   </TableCell>
                 </TableRow>
               ))}

@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import { AuthCard } from "@/components/auth-card";
 import { Button } from "@/components/ui/button";
@@ -121,10 +121,26 @@ function SignIn() {
     retry: 1,
   });
   const [password, setPassword] = useState(false);
+  const [waited, setWaited] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setWaited(true), 3000);
+    return () => window.clearTimeout(t);
+  }, []);
+  if (!cfg && !isError && !waited) {
+    // never a blank card: a neutral placeholder while the API answers (it may be waking up)
+    return (
+      <div className="space-y-3" role="status" aria-live="polite">
+        <div className="h-9 animate-pulse rounded-md bg-muted" />
+        <div className="h-9 animate-pulse rounded-md bg-muted" />
+        <p className="text-xs text-muted-foreground">Connecting…</p>
+      </div>
+    );
+  }
+  // API unreachable or slow: show the quick form (the deployed mode) with a clear message instead of freezing.
   const quick = (cfg?.auth_mode ?? "quick") === "quick" && !password;
   return (
     <>
-      {isError && (
+      {!cfg && (isError || waited) && (
         <p role="alert" className="mb-3 text-sm text-destructive">
           Can&apos;t reach the server right now. It may be starting up — try again in a minute.
         </p>

@@ -17,6 +17,8 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMe } from "@/hooks/auth";
+import { useCurrency } from "@/hooks/currency";
+import { formatMoney } from "@/lib/money";
 import { errorToast } from "@/hooks/queries";
 import { api } from "@/lib/api";
 
@@ -167,6 +169,7 @@ function UsersTab() {
 }
 
 function UsageTab() {
+  const { rate } = useCurrency();
   const { data } = useQuery({ queryKey: ["admin-usage"], queryFn: () => api<Usage>("/admin/usage") });
   if (!data) return null;
   return (
@@ -179,8 +182,13 @@ function UsageTab() {
         <CardContent className="space-y-1 text-sm">
           <div>
             Spent {usd(data.global.spent_usd)} of {usd(data.global.budget_usd)}
+            <span className="text-muted-foreground"> (≈ {formatMoney(Math.round(data.global.spent_usd * rate), "VND", rate)} of {formatMoney(Math.round(data.global.budget_usd * rate), "VND", rate)})</span>
           </div>
-          <div>Default per-user daily cap {usd(data.global.user_daily_usd_cap)}</div>
+          <div>
+            Default per-user daily cap {usd(data.global.user_daily_usd_cap)}
+            <span className="text-muted-foreground"> (≈ {formatMoney(Math.round(data.global.user_daily_usd_cap * rate), "VND", rate)})</span>
+          </div>
+          <div className="text-xs text-muted-foreground">AI usage and caps are billed and capped in USD (the provider&apos;s currency); VND is shown for reference.</div>
           <div className="text-xs text-muted-foreground">
             Model {data.model.model} · embeddings {data.model.embedding_model} · mode {data.model.mode}
           </div>

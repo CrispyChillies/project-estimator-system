@@ -11,6 +11,8 @@ import { AgentPanel } from "@/components/estimate/agent-panel";
 import { EstimateTable, type Highlight } from "@/components/estimate/estimate-table";
 import { SummaryPanel } from "@/components/estimate/summary-panel";
 import { WhySheet } from "@/components/estimate/why-sheet";
+import { CurrencyToggle } from "@/components/currency-toggle";
+import { CategoryTag } from "@/components/tags";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -42,6 +45,8 @@ import {
   useSummary,
 } from "@/hooks/queries";
 import { useEstimateJobs } from "@/hooks/estimate-jobs";
+import { useCurrency } from "@/hooks/currency";
+import { useMediaQuery } from "@/hooks/media";
 import { api, downloadUrl } from "@/lib/api";
 import { factor } from "@/lib/format";
 import type { Estimate, ProposalOp, TaskOut } from "@/lib/types";
@@ -80,7 +85,9 @@ function CompareView({ estimateId, other, estimates }: { estimateId: string; oth
             return (
               <TableRow key={r.ai_key ?? r.title}>
                 <TableCell>{r.title}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">{r.category}</TableCell>
+                <TableCell>
+                  <CategoryTag name={r.category} />
+                </TableCell>
                 <TableCell className="text-right tabular-nums">{ma !== null ? `${r.a_min}–${r.a_max}` : "—"}</TableCell>
                 <TableCell className={`text-right tabular-nums ${up ? "text-amber-700 dark:text-amber-400" : down ? "text-sky-700 dark:text-sky-400" : ""}`}>
                   {mb !== null ? `${r.b_min}–${r.b_max}` : "—"}
@@ -118,6 +125,8 @@ export function EstimateTab({
   const { data: summary } = useSummary(estimateId);
   const { data: roles } = useRoles();
   const { data: categories } = useCategories();
+  const { currency } = useCurrency();
+  const wide = useMediaQuery("(min-width: 1024px)");
   const { data: proposals } = useProposals(estimateId);
   const [why, setWhy] = useState<TaskOut | null>(null);
   const [agent, setAgentState] = useState(
@@ -290,15 +299,16 @@ export function EstimateTab({
             {estimatingBatch ? "Estimating…" : `AI estimate ${pendingIds.length} added task${pendingIds.length > 1 ? "s" : ""}`}
           </Button>
         )}
+        <CurrencyToggle />
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button size="sm" variant="outline" />}>
             <Download /> Export
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => window.open(downloadUrl(`/estimates/${estimateId}/export?format=xlsx`))}>
+            <DropdownMenuItem onClick={() => window.open(downloadUrl(`/estimates/${estimateId}/export?format=xlsx&currency=${currency}`))}>
               Excel (.xlsx)
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => window.open(downloadUrl(`/estimates/${estimateId}/export?format=csv`))}>
+            <DropdownMenuItem onClick={() => window.open(downloadUrl(`/estimates/${estimateId}/export?format=csv&currency=${currency}`))}>
               CSV (flat)
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -341,7 +351,7 @@ export function EstimateTab({
   );
 
   const main = (
-    <div className={agent ? "grid gap-4" : "grid gap-4 xl:grid-cols-[1fr_320px]"}>
+    <div className={agent && wide ? "grid gap-4" : "grid gap-4 xl:grid-cols-[1fr_320px]"}>
       <div className="min-w-0 overflow-x-auto">
         {isLoading || !tree || !roles || !categories ? (
           <Skeleton className="h-96" />
@@ -364,30 +374,57 @@ export function EstimateTab({
     </div>
   );
 
+  const agentPanel = estimateId ? (
+    <AgentPanel
+      estimateId={estimateId}
+      projectId={projectId}
+      readOnly={!!readOnly}
+      onClose={() => setAgent(false)}
+      onPatch={flash}
+      onShowTasks={showTasks}
+      selectedIds={[...selection]}
+      onClearSelection={() => setSelection(new Set())}
+    />
+  ) : null;
+
+  const saveLayout = (layout: Record<string, number>) => window.localStorage.setItem("calibr.agentLayout", JSON.stringify(layout));
+  let savedLayout: Record<string, number> | undefined;
+  try {
+    savedLayout = JSON.parse(window.localStorage.getItem("calibr.agentLayout") ?? "null") ?? undefined;
+  } catch {
+    savedLayout = undefined;
+  }
+
+  // Viewport-height workspace: the page never scrolls; the table pane and the chat scroll independently.
   return (
-    <div className="space-y-3">
-      {toolbar}
-      {agent && estimateId ? (
-        <ResizablePanelGroup orientation="horizontal" className="h-[calc(100vh-11rem)] min-h-[560px] rounded-lg border">
-          <ResizablePanel defaultSize="68%" minSize="40%">
-            <div className="h-full overflow-auto p-3">{main}</div>
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize="32%" minSize="22%">
-            <AgentPanel
-              estimateId={estimateId}
-              projectId={projectId}
-              readOnly={!!readOnly}
-              onClose={() => setAgent(false)}
-              onPatch={flash}
-              onShowTasks={showTasks}
-              selectedIds={[...selection]}
-              onClearSelection={() => setSelection(new Set())}
-            />
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      ) : (
-        main
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="shrink-0">{toolbar}</div>
+      <div className="min-h-0 flex-1">
+        {agent && agentPanel && wide ? (
+          <ResizablePanelGroup orientation="horizontal" className="h-full rounded-lg border" defaultLayout={savedLayout} onLayoutChanged={saveLayout}>
+            <ResizablePanel id="table" defaultSize="68%" minSize="40%">
+              <div className="h-full overflow-y-auto p-3" data-testid="table-pane">
+                {main}
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel id="agent" defaultSize="32%" minSize="22%">
+              {agentPanel}
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        ) : (
+          <div className="h-full overflow-y-auto" data-testid="table-pane">
+            {main}
+          </div>
+        )}
+      </div>
+      {agent && agentPanel && !wide && (
+        <Sheet open onOpenChange={(o) => !o && setAgent(false)}>
+          <SheetContent side="right" showCloseButton={false} className="h-dvh w-full gap-0 p-0 sm:max-w-md" data-testid="agent-drawer">
+            <SheetTitle className="sr-only">Agent</SheetTitle>
+            {agentPanel}
+          </SheetContent>
+        </Sheet>
       )}
       <WhySheet task={why} onClose={() => setWhy(null)} />
     </div>

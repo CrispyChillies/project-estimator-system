@@ -55,7 +55,11 @@ test("message streams, tool card appears, table changes live, undo restores", as
   const card = page.getByTestId("tool-card").last();
   await expect(card).toContainText("Bulk adjust");
   await expect(card).toContainText("applied");
-  await expect(card).toContainText("percent: 20");
+  await expect(async () => {
+    const toggle = card.locator("button[aria-expanded]").first();
+    if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click(); // cards are collapsed by default
+    await expect(card).toContainText("percent: 20", { timeout: 1500 });
+  }).toPass({ timeout: 15_000 });
   await expect(page.getByText(/^Done: /).last()).toBeVisible();
   await expect.poll(maxValues).not.toEqual(before);
   await card.getByRole("button", { name: "JSON" }).click();
@@ -72,7 +76,7 @@ test("delete needs confirmation", async () => {
   const card = page.getByTestId("tool-card").last();
   await expect(card).toContainText("awaiting confirmation");
   await expect(card).toContainText("Deletes always need confirmation");
-  await card.getByRole("button", { name: "Confirm" }).click();
+  await card.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect(card).toContainText("applied");
   await expect(page.locator("[data-task-id] span.truncate", { hasText: title })).toHaveCount(0);
 });

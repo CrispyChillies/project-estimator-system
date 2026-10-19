@@ -13,6 +13,7 @@ import { QuestionsTab } from "@/components/project/questions-tab";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEstimates, useProject } from "@/hooks/queries";
+import { cn } from "@/lib/utils";
 
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,9 +34,11 @@ export default function ProjectPage() {
   if (error) return <ErrorState error={error} />;
   if (isLoading || !project) return <Skeleton className="h-40 w-full" />;
 
+  // The estimate tab is a viewport-height workspace (the page itself does not scroll); other tabs flow normally.
+  const fixed = tab === "estimate";
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className={cn("space-y-4", fixed && "flex h-[calc(100dvh-3rem-2rem)] flex-col gap-3 space-y-0 overflow-hidden md:h-[calc(100dvh-3rem-3rem)]")}>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold tracking-tight">{project.name}</h1>
         <StatusBadge status={project.status} />
         {project.client_name && <span className="text-sm text-muted-foreground">· {project.client_name}</span>}
@@ -45,8 +48,8 @@ export default function ProjectPage() {
           </div>
         )}
       </div>
-      <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
-        <TabsList>
+      <Tabs value={tab} onValueChange={(v) => setTab(String(v))} className={cn(fixed && "min-h-0 flex-1")}>
+        <TabsList className="shrink-0">
           <TabsTrigger value="overview">Overview & Documents</TabsTrigger>
           <TabsTrigger value="estimate">Estimate</TabsTrigger>
           <TabsTrigger value="questions">Questions & Risks</TabsTrigger>
@@ -63,7 +66,7 @@ export default function ProjectPage() {
             }}
           />
         </TabsContent>
-        <TabsContent value="estimate" className="pt-3">
+        <TabsContent value="estimate" className="min-h-0 pt-3">
           <EstimateTab
             projectId={id}
             estimates={estimates ?? []}

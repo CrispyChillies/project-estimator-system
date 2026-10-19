@@ -1,11 +1,13 @@
 "use client";
 
+import { CategoryTag, RoleTag } from "@/components/tags";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
   Bot,
   Brain,
   Check,
+  ArrowDown,
   ChevronDown,
   Crosshair,
   Loader2,
@@ -33,7 +35,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -56,7 +57,7 @@ export interface PatchHandlers {
 }
 
 const SLASH = [
-  { cmd: "/fit ", hint: "/fit 400 — fit total max hours to a budget" },
+  { cmd: "/fit ", hint: "/fit 400 or /fit 200tr — fit hours (or cost) to a budget" },
   { cmd: "/adjust ", hint: "/adjust +10% backend — scale hours" },
   { cmd: "/round", hint: "/round — round all hours to 0.5 h" },
   { cmd: "/similar", hint: "/similar — 3 most similar past projects" },
@@ -74,6 +75,7 @@ const STARTERS = [
 
 const TOOL_LABEL: Record<string, string> = {
   fit_to_budget: "Fit to budget",
+  fit_to_cost_budget: "Fit to cost budget",
   rebalance_roles: "Rebalance roles",
   bulk_adjust: "Bulk adjust",
   set_hours: "Set hours",
@@ -156,8 +158,11 @@ function ToolCard({
   const opId = op?.id ?? live?.operation_id;
   const undo = op?.result.undo;
   const [raw, setRaw] = useState(false);
+  const [open, setOpen] = useState(status === "awaiting_confirmation" || status === "error" || status === "failed");
+  const [more, setMore] = useState(false);
   const callArgs = args ?? (entry as ToolLogEntry | undefined)?.args;
   const ms = (entry as LiveResult | undefined)?.duration_ms;
+  const long = (text?.length ?? 0) > 180;
   return (
     <div
       className={cn(
@@ -166,40 +171,68 @@ function ToolCard({
         (status === "error" || status === "failed") && "border-rose-500/50",
       )}
       data-testid="tool-card"
+      data-expanded={open}
     >
-      <div className="flex items-center gap-1.5">
-        {!entry ? <Loader2 className="size-3.5 animate-spin" /> : <Wrench className="size-3.5 text-muted-foreground" />}
-        <span className="font-medium">{TOOL_LABEL[name] ?? name}</span>
-        {ms !== undefined && <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">{ms} ms</span>}
-        <Badge variant="outline" className={cn("h-4 px-1.5 text-[10px]", ms === undefined && "ml-auto")}>
+      <button
+        type="button"
+        className="flex w-full items-center gap-1.5 text-left"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {!entry ? <Loader2 className="size-3.5 shrink-0 animate-spin" /> : <Wrench className="size-3.5 shrink-0 text-muted-foreground" />}
+        <span className="shrink-0 font-medium">{TOOL_LABEL[name] ?? name}</span>
+        {!open && text && <span className="min-w-0 flex-1 truncate text-muted-foreground">{text}</span>}
+        {(open || !text) && <span className="flex-1" />}
+        {ms !== undefined && <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">{ms} ms</span>}
+        <Badge variant="outline" className="h-4 shrink-0 px-1.5 text-[10px]">
           {status.replaceAll("_", " ")}
         </Badge>
-      </div>
-      {callArgs && Object.keys(callArgs).length > 0 && (
-        <div className="mt-0.5 text-muted-foreground">
-          {argsSummary(callArgs)}{" "}
-          <button type="button" className="underline underline-offset-2" onClick={() => setRaw((r) => !r)} aria-expanded={raw}>
-            {raw ? "hide JSON" : "JSON"}
-          </button>
-          {raw && <pre className="mt-1 max-h-40 overflow-auto rounded bg-muted p-1.5 text-[10px]">{JSON.stringify(callArgs, null, 2)}</pre>}
-        </div>
-      )}
-      {text && <div className={cn("mt-1", entry && !entry.ok && "text-rose-700 dark:text-rose-400")}>{text}</div>}
-      {before && after && (
-        <div className="mt-1 tabular-nums text-muted-foreground">
-          Total {range(before)} → <span className="font-medium text-foreground">{range(after)}</span>
-        </div>
-      )}
-      {status === "awaiting_confirmation" && reasons?.length ? (
-        <ul className="mt-1 list-disc pl-4 text-amber-700 dark:text-amber-400">
-          {reasons.map((r) => (
-            <li key={r}>{r}</li>
-          ))}
-        </ul>
-      ) : null}
-      {undo && undo.skipped.length > 0 && (
-        <div className="mt-1 text-amber-700 dark:text-amber-400">
-          Partial undo: kept {undo.skipped.map((s) => s.title).join(", ")} (edited after the agent change).
+        <ChevronDown className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />
+      </button>
+      {open && (
+        <div className="mt-1 space-y-1">
+          {(typeof callArgs?.role === "string" || typeof callArgs?.category === "string") && (
+            <div className="flex flex-wrap gap-1">
+              {typeof callArgs?.role === "string" && <RoleTag name={callArgs.role} />}
+              {typeof callArgs?.category === "string" && <CategoryTag name={callArgs.category} />}
+            </div>
+          )}
+          {callArgs && Object.keys(callArgs).length > 0 && (
+            <div className="text-muted-foreground">
+              {argsSummary(callArgs)}{" "}
+              <button type="button" className="underline underline-offset-2" onClick={() => setRaw((r) => !r)} aria-expanded={raw}>
+                {raw ? "hide JSON" : "JSON"}
+              </button>
+              {raw && <pre className="mt-1 max-h-40 overflow-auto rounded bg-muted p-1.5 text-[10px]">{JSON.stringify(callArgs, null, 2)}</pre>}
+            </div>
+          )}
+          {text && (
+            <div className={cn(entry && !entry.ok && "text-rose-700 dark:text-rose-400")}>
+              <div className={cn(long && !more && "line-clamp-3")}>{text}</div>
+              {long && (
+                <button type="button" className="underline underline-offset-2" onClick={() => setMore((m) => !m)}>
+                  {more ? "Show less" : "Show more"}
+                </button>
+              )}
+            </div>
+          )}
+          {before && after && (
+            <div className="tabular-nums text-muted-foreground">
+              Total {range(before)} → <span className="font-medium text-foreground">{range(after)}</span>
+            </div>
+          )}
+          {status === "awaiting_confirmation" && reasons?.length ? (
+            <ul className="list-disc pl-4 text-amber-700 dark:text-amber-400">
+              {reasons.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          ) : null}
+          {undo && undo.skipped.length > 0 && (
+            <div className="text-amber-700 dark:text-amber-400">
+              Partial undo: kept {undo.skipped.map((sk) => sk.title).join(", ")} (edited after the agent change).
+            </div>
+          )}
         </div>
       )}
       {opId && (
@@ -330,7 +363,9 @@ export function AgentPanel({
   const create = useCreateSession(estimateId);
   const patch = usePatchSession(estimateId);
   const del = useDeleteSession(estimateId);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const stick = useRef(true);
+  const [away, setAway] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const creating = useRef(false);
   const opById = useMemo(() => new Map((ops ?? []).map((o) => [o.id, o])), [ops]);
@@ -349,9 +384,39 @@ export function AgentPanel({
     }
   }, [sessions, readOnly, docs, create, defaultTitle]);
 
+  // Scroll only the message list (never the page); follow new messages unless the user scrolled up.
+  const toLatest = () => {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+    stick.current = true;
+    setAway(false);
+  };
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
+    if (stick.current) {
+      const el = listRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    } else setAway(true);
   }, [messages, live, ops]);
+  useEffect(() => {
+    // opening a session shows its latest message
+    stick.current = true;
+    const t = window.setTimeout(toLatest, 0);
+    return () => window.clearTimeout(t);
+  }, [sessionId]);
+  const onListScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+    stick.current = atBottom;
+    if (atBottom) setAway(false);
+  };
+  useEffect(() => {
+    // composer grows with its content up to about five lines, then scrolls
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, [text]);
 
   const refreshAgent = async () => {
     if (!sessionId) return;
@@ -534,8 +599,8 @@ export function AgentPanel({
   };
 
   return (
-    <div className="flex h-full flex-col gap-2 p-3" aria-label="Agent panel">
-      <div className="flex items-center gap-1.5">
+    <div className="flex h-full min-h-0 flex-col gap-2 p-3" aria-label="Agent panel" data-testid="agent-panel">
+      <div className="flex shrink-0 items-center gap-1.5">
         <Bot className="size-4" />
         <span className="font-medium">Agent</span>
         <div className="ml-auto flex items-center gap-1">
@@ -597,7 +662,7 @@ export function AgentPanel({
           </Button>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto [&>*]:shrink-0">
         <ToggleGroup
           value={[session?.apply_mode ?? "auto"]}
           onValueChange={(v) =>
@@ -623,8 +688,9 @@ export function AgentPanel({
         )}
       </div>
 
-      <ScrollArea className="min-h-0 flex-1 rounded-md border">
-        <div className="space-y-2 p-2" aria-live="polite">
+      <div className="relative min-h-0 flex-1">
+        <div ref={listRef} onScroll={onListScroll} className="h-full overflow-y-auto overscroll-contain rounded-md border" data-testid="chat-log">
+          <div className="space-y-2 p-2" aria-live="polite">
           {shown.length === 0 && live.length === 0 && (
             <div className="space-y-2">
               <Bubble role="assistant">
@@ -694,11 +760,22 @@ export function AgentPanel({
               <Loader2 className="size-3.5 animate-spin" /> {remoteRunning ? "Agent is still working…" : "Working…"}
             </div>
           )}
-          <div ref={bottomRef} />
+          </div>
         </div>
-      </ScrollArea>
+        {away && (
+          <Button
+            size="xs"
+            variant="secondary"
+            className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full shadow"
+            data-testid="jump-to-latest"
+            onClick={toLatest}
+          >
+            <ArrowDown /> Jump to latest
+          </Button>
+        )}
+      </div>
 
-      <div className="relative">
+      <div className="relative shrink-0 pb-[env(safe-area-inset-bottom)]" data-testid="composer">
         {slashOpen && (
           <div className="absolute bottom-full mb-1 w-full rounded-md border bg-popover p-1 text-xs shadow-md" role="listbox">
             {SLASH.filter((s) => s.cmd.startsWith(text)).map((s) => (
@@ -727,7 +804,8 @@ export function AgentPanel({
         >
           <Textarea
             ref={inputRef}
-            rows={2}
+            rows={1}
+            className="max-h-[120px] min-h-9 resize-none"
             value={text}
             disabled={readOnly}
             aria-label="Message the agent"
@@ -751,8 +829,8 @@ export function AgentPanel({
           )}
         </form>
       </div>
-      <div className="flex justify-between text-[11px] text-muted-foreground">
-        <span>{session?.apply_mode === "review" ? "Review mode: every change waits for you" : "Auto mode: safe changes apply"}</span>
+      <div className="flex shrink-0 justify-between gap-2 text-[11px] text-muted-foreground">
+        <span className="truncate">{session?.apply_mode === "review" ? "Review mode: every change waits for you" : "Auto mode: safe changes apply"}</span>
         <span className="tabular-nums" data-testid="agent-cost">
           AI use this session ${(session?.cost_usd ?? 0).toFixed(3)}
         </span>
