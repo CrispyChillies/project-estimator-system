@@ -8,6 +8,7 @@ if (!BASE) {
   console.error("usage: node scripts/deploy_check.mjs <url>");
   process.exit(2);
 }
+const RUN = `CALIBR-RUN-${Date.now().toString(36)}`; // prefix for everything this run creates
 const HTTPS = BASE.startsWith("https://");
 const jar = new Map();
 const rawCookies = [];
@@ -61,7 +62,7 @@ async function main() {
   const noCsrf = await req("POST", "/api/v1/auth/login", { body: { email: "x@example.com", password: "x" }, csrf: false });
   check("write without CSRF token → 403", noCsrf.status === 403, `HTTP ${noCsrf.status}`);
   const cfg = await (await req("GET", "/api/v1/auth/config")).json().catch(() => ({}));
-  const signup = await req("POST", "/api/v1/auth/signup", { body: { name: "Check", email: `check-${Date.now()}@example.com`, password: "a-long-password-123" } });
+  const signup = await req("POST", "/api/v1/auth/signup", { body: { name: `${RUN} signup`, email: `${RUN.toLowerCase()}@example.com`, password: "a-long-password-123" } });
   const mode = cfg.signup_mode ?? cfg.mode ?? "?";
   check(`sign-up rules (mode: ${mode})`, mode === "?" ? false : mode === "open" ? signup.status < 300 : signup.status >= 400, `HTTP ${signup.status}`);
   const bad = await req("POST", "/api/v1/auth/login", { body: { email: "nobody@example.com", password: "wrong-password-123" } });
@@ -85,32 +86,35 @@ async function main() {
     const locked = await req("POST", "/api/v1/projects", { body: { name: "model override check", model: "some-other-model" } });
     check("model cannot be changed by users", locked.status === 400, `HTTP ${locked.status}`);
     if (process.env.DEPLOY_CHECK_AI === "1") {
-      const p = await (await req("POST", "/api/v1/projects", { body: { name: `Deploy check ${new Date().toISOString()}` } })).json();
-      await req("POST", `/api/v1/projects/${p.id}/documents/paste`, { body: { title: "brief", text: "Booking web app with customer login, online payments and an admin panel for staff." } });
-      const job = await (await req("POST", `/api/v1/projects/${p.id}/estimates/generate`, { body: { document_ids: [], learning: true } })).json();
-      let status = "";
-      for (let i = 0; i < 240 && !["done", "failed"].includes(status); i++) {
-        status = (await (await req("GET", `/api/v1/jobs/${job.id}`)).json()).status;
-        if (status !== "done") await new Promise((r) => setTimeout(r, 1000));
+      const p = await (await req("POST", "/api/v1/projects", { body: { name: `${RUN} project` } })).json();
+      try {
+        await req("POST", `/api/v1/projects/${p.id}/documents/paste`, { body: { title: "brief", text: "Booking web app with customer login, online payments and an admin panel for staff." } });
+        const job = await (await req("POST", `/api/v1/projects/${p.id}/estimates/generate`, { body: { document_ids: [], learning: true } })).json();
+        let status = "";
+        for (let i = 0; i < 240 && !["done", "failed"].includes(status); i++) {
+          status = (await (await req("GET", `/api/v1/jobs/${job.id}`)).json()).status;
+          if (status !== "done") await new Promise((r) => setTimeout(r, 1000));
+        }
+        check("estimate generation (live model)", status === "done", status);
+        const [est] = await (await req("GET", `/api/v1/projects/${p.id}/estimates`)).json();
+        const s = await (await req("POST", `/api/v1/estimates/${est.id}/agent/sessions`, { body: {} })).json();
+        const t0 = Date.now();
+        const run = await req("POST", `/api/v1/agent/sessions/${s.id}/runs`, { body: { text: "Reduce QA by 10%" }, headers: { Accept: "text/event-stream" } });
+        let first = 0;
+        let body = "";
+        const reader = run.body.getReader();
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          first ||= Date.now() - t0;
+          body += new TextDecoder().decode(value);
+        }
+        check("agent chat streams (SSE)", run.status === 200 && /event: run_done/.test(body) && !/event: error/.test(body),
+          `first chunk ${first} ms, total ${Date.now() - t0} ms, encoding ${run.headers.get("content-encoding") ?? "none"}`);
+      } finally {
+        const del = await req("DELETE", `/api/v1/projects/${p.id}`);
+        check("cleanup (own project removed)", del.status < 300, `HTTP ${del.status}`);
       }
-      check("estimate generation (live model)", status === "done", status);
-      const [est] = await (await req("GET", `/api/v1/projects/${p.id}/estimates`)).json();
-      const s = await (await req("POST", `/api/v1/estimates/${est.id}/agent/sessions`, { body: {} })).json();
-      const t0 = Date.now();
-      const run = await req("POST", `/api/v1/agent/sessions/${s.id}/runs`, { body: { text: "Reduce QA by 10%" }, headers: { Accept: "text/event-stream" } });
-      let first = 0;
-      let body = "";
-      const reader = run.body.getReader();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        first ||= Date.now() - t0;
-        body += new TextDecoder().decode(value);
-      }
-      check("agent chat streams (SSE)", run.status === 200 && /event: run_done/.test(body) && !/event: error/.test(body),
-        `first chunk ${first} ms, total ${Date.now() - t0} ms, encoding ${run.headers.get("content-encoding") ?? "none"}`);
-      const del = await req("DELETE", `/api/v1/projects/${p.id}`);
-      check("cleanup", del.status < 300, `HTTP ${del.status}`);
     }
     await req("POST", "/api/v1/auth/logout");
   }

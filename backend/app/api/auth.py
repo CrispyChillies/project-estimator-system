@@ -14,6 +14,7 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db.models import PasswordReset, User
 from app.db.session import get_db
+from app.services.accounts import purge_guest
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -147,6 +148,15 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)) 
     if found:
         found[0].revoked_at = datetime.now(UTC)
         db.commit()
+    response.delete_cookie(A.SESSION_COOKIE, path="/")
+    response.status_code = 204
+    return response
+
+
+@router.delete("/me", status_code=204)
+def delete_me(response: Response, user: User = Depends(A.current_user), db: Session = Depends(get_db)) -> Response:
+    """Guests (quick sign-in) can remove their own account and projects; admins and password accounts cannot."""
+    purge_guest(db, user)
     response.delete_cookie(A.SESSION_COOKIE, path="/")
     response.status_code = 204
     return response
