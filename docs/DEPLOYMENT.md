@@ -135,3 +135,17 @@ To go back to full accounts set `AUTH_MODE=password` and `SIGNUP_MODE=invite` + 
 - Live Playwright pass (`e2e/live-prod.spec.ts`, 19 Oct 2026, ~23:05 UTC, 1280x720): quick sign-in as a new guest "Release check", real-model estimate, VND shown by default (cost-mid 285 triệu), USD toggle saved and persisted after reload, composer in view with the page not scrolling, real-model chat message "Reduce all backend tasks by 10%" changed the table, role tags rendered, sign-out. 1 passed.
 - The live pass created guest members and projects named "Release check…"/"curl check/curl proj" in the production database (test data, removable by the admin).
 - Render's small instance reset a few connections while estimate jobs ran; earlier live runs failed on that and on spec races (spec hardened), not on the app.
+
+## Test residue cleanup and production state (20 Oct 2026)
+- Live checks now tag everything with a `CALIBR-RUN-<id>` prefix and remove it in `finally`: `e2e/live-prod.spec.ts` signs in as a guest named `CALIBR-RUN-<id> guest` and calls `DELETE /api/v1/auth/me` at the end (new guest-only endpoint: deletes that guest, its projects and sessions; admins, password accounts and archived data are refused with 403). `make deploy-check` tags its projects and deletes them in `finally`.
+- Verified live: the spec run `CALIBR-RUN-mvfxgmz2` ended with `DELETE /auth/me -> 204`; the earlier "curl check" guest was removed the same way (204, then `/auth/me` 401).
+- Leftovers from before the prefix (guests named "Release check", "curl check"; projects "Release check …", "curl proj") remain in production. This session has no production `DATABASE_URL` (the one in the environment points to `localhost/calibr`), so nothing was run against production. Dry-run against local dev DB: 0 users, 0 projects matched. Production matched counts: not recorded (not run).
+- To clean production, from a shell with the production `DATABASE_URL` exported (read it from the Render dashboard; do not paste it anywhere):
+  ```
+  scripts/cleanup_test_residue.sh            # dry run: lists users and projects (owner, created_at, name); exit 2 = refused
+  scripts/cleanup_test_residue.sh --confirm  # deletes exactly the listed guests and their projects
+  ```
+  It matches only non-admin, non-archived `@guest.calibr` users named "Release check", "curl check" or `CALIBR-RUN-*` and projects named "Release check *", "curl proj" or `CALIBR-RUN-*`; it refuses if a matched project is owned by anyone else (including the admin) or a matched guest owns any other project.
+- Landing page: all 49 images in `frontend/public/landing` and `frontend/public/help` are byte-identical on the live site (SHA-256) and show VND amounts, the fixed-height chat with the pinned composer, collapsed tool cards and coloured role/category tags. The "Screenshots show fictional sample data." footnote is present on the live landing page. No regeneration or frontend redeploy was needed.
+- Production: `/api/v1/ready` = `{"status":"ready","migration":"0006"}`, `/api/v1/health` = ok, DB true. `make deploy-check`: 14 passed, 0 failed, 1 skipped.
+- Deployed commit: `d5a6009` (backend serves `DELETE /auth/me`; the frontend assets match this commit). Render exposes no commit endpoint, so this is inferred from that behaviour. `main` equals `origin/main` at `d5a6009`; the only later commit is this docs change (docs-only difference).
